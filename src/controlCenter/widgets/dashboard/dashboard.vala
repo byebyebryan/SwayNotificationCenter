@@ -3,47 +3,18 @@ namespace SwayNotificationCenter.Widgets {
         public override string widget_name { get {
                                                  return "dashboard";
                                              } }
-        Gtk.Grid grid = new Gtk.Grid ();
         BaseWidget[] cards;
-        ulong[] visibility_handlers = {};
 
         public Dashboard (string suffix) {
             base (suffix);
-            grid.column_homogeneous = true;
-            grid.column_spacing = 12;
-            grid.row_spacing = 12;
-            grid.hexpand = true;
+            orientation = Gtk.Orientation.VERTICAL;
+            spacing = 12;
             cards = { new SystemStats (suffix, true), new Battery (suffix, true),
                       new Wifi (suffix), new Bluetooth (suffix) };
             for (int i = 0; i < cards.length; i++) {
                 cards[i].add_css_class ("dashboard-card");
                 cards[i].hexpand = true;
-                grid.attach (cards[i], i % 2, i / 2);
-                visibility_handlers += cards[i].notify["visible"].connect (reflow);
-            }
-            append (grid);
-            reflow ();
-        }
-
-        void reflow () {
-            int count = 0;
-            foreach (var card in cards) {
-                if (card.visible) {
-                    count++;
-                }
-            }
-            int index = 0;
-            foreach (var card in cards) {
-                if (!card.visible) {
-                    continue;
-                }
-                // Change grid metadata without reparenting: unroot would cancel card work.
-                var child =
-                    (Gtk.GridLayoutChild) grid.get_layout_manager ().get_layout_child (card);
-                child.column = index % 2;
-                child.row = index / 2;
-                child.column_span = index == count - 1 && count % 2 == 1 ? 2 : 1;
-                index++;
+                append (cards[i]);
             }
         }
 
@@ -55,10 +26,6 @@ namespace SwayNotificationCenter.Widgets {
 
         public override void unroot () {
             on_cc_visibility_change (false);
-            for (int i = 0; i < visibility_handlers.length; i++) {
-                cards[i].disconnect (visibility_handlers[i]);
-            }
-            visibility_handlers = {};
             base.unroot ();
         }
     }
@@ -139,16 +106,24 @@ namespace SwayNotificationCenter.Widgets {
         public Wifi (string suffix) {
             base (suffix, "org.freedesktop.NetworkManager", "/org/freedesktop");
             add_heading ("Wi-Fi");
-            var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
+            var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
+            row.homogeneous = true;
             network_name = new Gtk.Label ("—");
             network_name.xalign = 0;
             network_name.hexpand = true;
             network_name.ellipsize = Pango.EllipsizeMode.END;
             network_name.max_width_chars = 1;
             strength = new Gtk.Label ("");
+            strength.xalign = 1;
+            strength.hexpand = true;
             strength.add_css_class ("metric-value");
+            var signal_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+            var signal_label = new Gtk.Label ("Signal");
+            signal_label.add_css_class ("metric-label");
+            signal_row.append (signal_label);
+            signal_row.append (strength);
             row.append (network_name);
-            row.append (strength);
+            row.append (signal_row);
             append (row);
         }
 
@@ -163,7 +138,7 @@ namespace SwayNotificationCenter.Widgets {
             var sample = WirelessData.WifiSample.parse (objects);
             network_name.label = sample.state == "Connected" ? sample.ssid : sample.state;
             network_name.tooltip_text = network_name.label;
-            strength.label = sample.strength >= 0 ? "%d%%".printf (sample.strength) : "";
+            strength.label = sample.strength >= 0 ? "%d%%".printf (sample.strength) : "—";
             visible = sample.present;
         }
     }
@@ -172,7 +147,7 @@ namespace SwayNotificationCenter.Widgets {
         public override string widget_name { get {
                                                  return "bluetooth";
                                              } }
-        Gtk.Box devices = new Gtk.Box (Gtk.Orientation.VERTICAL, 8);
+        Gtk.Grid devices = new Gtk.Grid ();
         Gtk.Button more = new Gtk.Button ();
         WirelessData.BluetoothSample ?sample;
         bool expanded = false;
@@ -180,6 +155,10 @@ namespace SwayNotificationCenter.Widgets {
         public Bluetooth (string suffix) {
             base (suffix, "org.bluez", "/");
             add_heading ("Bluetooth");
+            devices.column_homogeneous = true;
+            devices.column_spacing = 20;
+            devices.row_spacing = 8;
+            devices.hexpand = true;
             append (devices);
             more.add_css_class ("flat");
             more.add_css_class ("bluetooth-more");
@@ -213,7 +192,7 @@ namespace SwayNotificationCenter.Widgets {
                 var label = new Gtk.Label (sample.powered ? "No devices connected" : "Off");
                 label.xalign = 0;
                 label.wrap = true;
-                devices.append (label);
+                devices.attach (label, 0, 0, 2);
             }
             int count = (int) sample.devices.length;
             for (int i = 0; i < (expanded ? count : int.min (count, 2)); i++) {
@@ -231,7 +210,7 @@ namespace SwayNotificationCenter.Widgets {
                     percentage.add_css_class ("metric-value");
                     row.append (percentage);
                 }
-                devices.append (row);
+                devices.attach (row, i % 2, i / 2);
             }
             more.visible = count > 2;
             more.label = expanded ? "Show less" : "+%d more".printf (count - 2);

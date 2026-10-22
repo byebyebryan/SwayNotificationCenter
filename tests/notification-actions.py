@@ -311,7 +311,7 @@ def run(binary, client_test, dashboard_screenshot=None):
                     wifi_change(); pump(1.2)
                     assert calls == before and gpu_samples() == before_gpu, "removed dashboard retained work"
                     call("SetVisibility", "(b)", (False,))
-                    print(json.dumps({"result": "passed", "proof": "two-column dashboard lifecycle",
+                    print(json.dumps({"result": "passed", "proof": "stacked dashboard lifecycle",
                                       "checks": ["nested refresh", "coalesced Wi-Fi signals", "Bluetooth removal",
                                                  "service restart", "open reload", "hidden idle", "removal cleanup"]}))
                 finally:

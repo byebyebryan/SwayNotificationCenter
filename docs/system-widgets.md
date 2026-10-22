@@ -15,12 +15,15 @@ its polling intervals through `widget-config`:
 }
 ```
 
-The dashboard uses two equal columns for System, Battery, Wi-Fi and Bluetooth
-cards. Missing hardware cards hide and remaining cards reflow; the last unpaired
-card spans both columns. Volume and notifications can follow at full width.
+The dashboard stacks full-width System, Battery, Wi-Fi and Bluetooth cards.
+Each card uses two internal columns: CPU/RAM beside GPU/VRAM, battery
+state/charge beside power/ETA, network name beside signal strength, and pairs
+of Bluetooth devices. Missing hardware cards hide. Volume and notifications
+follow at full width.
 Long network/device names ellipsize with full-name tooltips and separate
 percentages. Bluetooth initially shows two connected devices, with expandable
-overflow that resets when the panel closes.
+overflow that resets when the panel closes. Expanded devices fill further
+two-column rows.
 
 System shows average reported CPU frequency, utilization between samples,
 and used RAM in GiB with a percentage (total in its tooltip). RAM uses

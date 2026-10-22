@@ -24,10 +24,19 @@ namespace SwayNotificationCenter.Widgets {
             grid.hexpand = true;
             cpu_value = add_metric (grid, 0, "CPU");
             memory_value = add_metric (grid, 1, "RAM");
-            append (grid);
             if (compact) {
+                var columns = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
+                columns.homogeneous = true;
+                columns.hexpand = true;
+                grid.valign = Gtk.Align.START;
                 gpu = new GpuStats (suffix);
-                append (gpu);
+                gpu.hexpand = true;
+                gpu.valign = Gtk.Align.START;
+                columns.append (grid);
+                columns.append (gpu);
+                append (columns);
+            } else {
+                append (grid);
             }
         }
 

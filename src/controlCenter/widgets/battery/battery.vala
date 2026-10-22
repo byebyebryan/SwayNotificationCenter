@@ -21,14 +21,29 @@ namespace SwayNotificationCenter.Widgets {
                 column_spacing = compact ? 6 : 16;
                 row_spacing = 8;
                 hexpand = true;
-                status = add_metric (this, 0,
+                Gtk.Grid state_grid = this;
+                Gtk.Grid power_grid = this;
+                if (compact) {
+                    column_homogeneous = true;
+                    column_spacing = 20;
+                    state_grid = new Gtk.Grid ();
+                    power_grid = new Gtk.Grid ();
+                    foreach (var grid in new Gtk.Grid[] { state_grid, power_grid }) {
+                        grid.column_spacing = 6;
+                        grid.row_spacing = 8;
+                        grid.hexpand = true;
+                    }
+                    attach (state_grid, 0, 0);
+                    attach (power_grid, 1, 0);
+                }
+                status = add_metric (state_grid, 0,
                                      compact ? (multiple ? name : "State") :
                                      (multiple ? "BAT %s".printf (name) : "BAT"));
                 if (compact) {
-                    charge = add_metric (this, 1, "Charge");
+                    charge = add_metric (state_grid, 1, "Charge");
                 }
-                power = add_metric (this, compact ? 2 : 1, "PWR");
-                eta = add_metric (this, compact ? 3 : 2, "ETA");
+                power = add_metric (power_grid, compact ? 0 : 1, "PWR");
+                eta = add_metric (power_grid, compact ? 1 : 2, "ETA");
                 power.tooltip_text = "Battery charge/discharge power";
                 eta.tooltip_text = "Approximate time at the current battery rate";
             }

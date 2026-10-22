@@ -446,7 +446,7 @@
     "$comment": "New widgets go here",
     "dashboard": {
       "type": "object",
-      "description": "Two-column system, battery, Wi-Fi and Bluetooth cards; absent hardware is hidden and the last unpaired card spans both columns",
+      "description": "Stacked full-width system, battery, Wi-Fi and Bluetooth cards with two internal columns; absent hardware is hidden",
       "additionalProperties": false,
       "properties": {}
     },
