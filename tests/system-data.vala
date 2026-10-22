@@ -55,6 +55,40 @@ void test_eta () {
     assert (sample.eta () == "—");
 }
 
+void test_resting_battery () {
+    var sample = new BatterySample ();
+    sample.state = "Full";
+    assert (!sample.resting_on_external_power ());
+    sample.external_power = true;
+    assert (sample.resting_on_external_power ());
+    sample.state = "Not charging";
+    sample.percentage = 76;
+    sample.limit = 80;
+    assert (!sample.resting_on_external_power ());
+    sample.start_threshold = 75;
+    assert (sample.resting_on_external_power ());
+    sample.percentage = 74;
+    assert (!sample.resting_on_external_power ());
+    sample.percentage = 80;
+    sample.start_threshold = 90;
+    assert (sample.resting_on_external_power ());
+    sample.state = "Charging";
+    assert (!sample.resting_on_external_power ());
+    sample.state = "Discharging";
+    assert (!sample.resting_on_external_power ());
+    sample.state = "Not charging";
+    sample.external_power = false;
+    assert (!sample.resting_on_external_power ());
+    sample.external_power = true;
+    sample.limit = -1;
+    sample.percentage = 99;
+    assert (!sample.resting_on_external_power ());
+    sample.percentage = 100;
+    assert (sample.resting_on_external_power ());
+    sample.percentage = -1;
+    assert (!sample.resting_on_external_power ());
+}
+
 void write_fixture (string root, string path, string contents) {
     string target = Path.build_filename (root, path);
     DirUtils.create_with_parents (Path.get_dirname (target), 0700);
@@ -93,11 +127,14 @@ async void test_reader_async (string root) {
     write_fixture (root, "supplies/absent/type", "Battery");
     write_fixture (root, "supplies/absent/present", "0");
     write_fixture (root, "supplies/AC/type", "Mains");
+    write_fixture (root, "supplies/AC/online", "1");
+    write_fixture (root, "supplies/BAT0/charge_control_start_threshold", "75");
     var batteries = yield reader.batteries (cancellable);
 
     assert (batteries.length == 1 && batteries[0].name == "BAT0");
     assert (batteries[0].power == 10000000 && batteries[0].current == 1000000);
     assert (batteries[0].eta () == "~03:00 to 80%");
+    assert (batteries[0].external_power && batteries[0].start_threshold == 75);
     write_fixture (root, "supplies/BAT0/status", "Discharging");
     write_fixture (root, "supplies/BAT0/power_now", "-5000000");
     write_fixture (root, "supplies/BAT0/energy_now", "20000000");
@@ -107,6 +144,19 @@ async void test_reader_async (string root) {
 
     assert (batteries.length == 2 && batteries[1].percentage == -1);
     assert (batteries[0].power == 5000000 && batteries[0].eta () == "~04:00 to empty");
+    write_fixture (root, "supplies/AC/online", "0");
+    write_fixture (root, "supplies/mouse/online", "1");
+    write_fixture (root, "supplies/dock/type", "USB");
+    write_fixture (root, "supplies/dock/scope", "Device");
+    write_fixture (root, "supplies/dock/online", "1");
+    batteries = yield reader.batteries (cancellable);
+
+    assert (!batteries[0].external_power);
+    write_fixture (root, "supplies/USB/type", "USB");
+    write_fixture (root, "supplies/USB/online", "1");
+    batteries = yield reader.batteries (cancellable);
+
+    assert (batteries[0].external_power);
     cancellable.cancel ();
     assert ((yield reader.batteries (cancellable)).length == 0);
 }
@@ -137,6 +187,7 @@ int main (string[] args) {
     Test.add_func ("/system-data/cpu", test_cpu);
     Test.add_func ("/system-data/memory-frequency", test_memory_frequency);
     Test.add_func ("/system-data/eta", test_eta);
+    Test.add_func ("/system-data/resting-battery", test_resting_battery);
     Test.add_func ("/system-data/reader", test_reader);
     return Test.run ();
 }

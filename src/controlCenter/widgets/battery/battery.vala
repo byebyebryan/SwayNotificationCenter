@@ -15,35 +15,43 @@ namespace SwayNotificationCenter.Widgets {
             Gtk.Label power;
             Gtk.Label eta;
             Gtk.Label ?charge;
+            Gtk.Box ?rate_row;
 
             public BatteryRow (string name, bool multiple, bool compact) {
                 this.supply_name = name;
                 column_spacing = compact ? 6 : 16;
                 row_spacing = 8;
                 hexpand = true;
-                Gtk.Grid state_grid = this;
-                Gtk.Grid power_grid = this;
                 if (compact) {
                     column_homogeneous = true;
                     column_spacing = 20;
-                    state_grid = new Gtk.Grid ();
-                    power_grid = new Gtk.Grid ();
-                    foreach (var grid in new Gtk.Grid[] { state_grid, power_grid }) {
+                    var charge_grid = new Gtk.Grid ();
+                    var state_grid = new Gtk.Grid ();
+                    var power_grid = new Gtk.Grid ();
+                    var eta_grid = new Gtk.Grid ();
+                    foreach (var grid in new Gtk.Grid[] { charge_grid, state_grid,
+                                                          power_grid, eta_grid }) {
                         grid.column_spacing = 6;
-                        grid.row_spacing = 8;
                         grid.hexpand = true;
                     }
-                    attach (state_grid, 0, 0);
-                    attach (power_grid, 1, 0);
+                    charge = add_metric (charge_grid, 0,
+                                         multiple ? "Charge %s".printf (name) : "Charge");
+                    status = add_metric (state_grid, 0, "State");
+                    power = add_metric (power_grid, 0, "PWR");
+                    eta = add_metric (eta_grid, 0, "ETA");
+                    attach (charge_grid, 0, 0);
+                    attach (state_grid, 1, 0);
+                    rate_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
+                    rate_row.homogeneous = true;
+                    rate_row.hexpand = true;
+                    rate_row.append (power_grid);
+                    rate_row.append (eta_grid);
+                    attach (rate_row, 0, 1, 2);
+                } else {
+                    status = add_metric (this, 0, multiple ? "BAT %s".printf (name) : "BAT");
+                    power = add_metric (this, 1, "PWR");
+                    eta = add_metric (this, 2, "ETA");
                 }
-                status = add_metric (state_grid, 0,
-                                     compact ? (multiple ? name : "State") :
-                                     (multiple ? "BAT %s".printf (name) : "BAT"));
-                if (compact) {
-                    charge = add_metric (state_grid, 1, "Charge");
-                }
-                power = add_metric (power_grid, compact ? 0 : 1, "PWR");
-                eta = add_metric (power_grid, compact ? 1 : 2, "ETA");
                 power.tooltip_text = "Battery charge/discharge power";
                 eta.tooltip_text = "Approximate time at the current battery rate";
             }
@@ -58,6 +66,9 @@ namespace SwayNotificationCenter.Widgets {
                 }
                 power.label = sample.power >= 0 ? "%.1f W".printf (sample.power / 1000000) : "—";
                 eta.label = sample.eta ();
+                if (rate_row != null) {
+                    rate_row.visible = !sample.resting_on_external_power ();
+                }
                 status.tooltip_text = sample.state;
                 eta.tooltip_text = "Approximate time at the current battery rate: " + sample.eta ();
                 debug ("battery sample: %s %s; PWR %s; ETA %s",

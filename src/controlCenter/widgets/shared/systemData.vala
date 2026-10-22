@@ -72,12 +72,32 @@ namespace SwayNotificationCenter.Widgets.SystemData {
         public string state = "Unknown";
         public double percentage = -1;
         public double limit = -1;
+        public double start_threshold = -1;
+        public bool external_power = false;
         public double power = -1; // microwatts
         public double current = -1; // microamps
         public double energy_now = -1; // microwatt-hours
         public double energy_full = -1;
         public double charge_now = -1; // microamp-hours
         public double charge_full = -1;
+
+        public bool resting_on_external_power () {
+            if (!external_power) {
+                return false;
+            }
+            if (state == "Full") {
+                return true;
+            }
+            if (state != "Not charging" || percentage < 0) {
+                return false;
+            }
+            double target = limit > 0 && limit <= 100 ? limit : 100;
+            // A stopped battery can drift through its configured charge window.
+            if (limit > 0 && limit <= 100 && start_threshold >= 0 && start_threshold < limit) {
+                target = start_threshold;
+            }
+            return percentage >= target;
+        }
 
         public string eta () {
             if (state != "Charging" && state != "Discharging") {
@@ -213,7 +233,23 @@ namespace SwayNotificationCenter.Widgets.SystemData {
 
         public async BatterySample[] batteries (Cancellable cancellable) {
             var samples = new GenericArray<BatterySample> ();
-            foreach (string name in children (supply_root)) {
+            string[] supplies = children (supply_root);
+            bool external_power = false;
+            foreach (string name in supplies) {
+                if (cancellable.is_cancelled ()) {
+                    break;
+                }
+                string path = Path.build_filename (supply_root, name);
+                string type = yield read (Path.build_filename (path, "type"), cancellable);
+
+                if (type != "" && type != "Battery"
+                    && (yield read (Path.build_filename (path, "scope"), cancellable)) != "Device"
+                    && (yield read (Path.build_filename (path, "online"), cancellable)) == "1") {
+                    external_power = true;
+                    break;
+                }
+            }
+            foreach (string name in supplies) {
                 if (cancellable.is_cancelled ()) {
                     break;
                 }
@@ -225,6 +261,7 @@ namespace SwayNotificationCenter.Widgets.SystemData {
                 }
                 var sample = new BatterySample ();
                 sample.name = name;
+                sample.external_power = external_power;
                 string state = yield read (Path.build_filename (path, "status"), cancellable);
 
                 if (state in new string[] { "Charging", "Discharging", "Full", "Not charging" }) {
@@ -237,6 +274,10 @@ namespace SwayNotificationCenter.Widgets.SystemData {
                                                                         "charge_control_end_threshold"),
                                                    cancellable));
                 sample.limit = limit > 0 && limit <= 100 ? limit : -1;
+                double start = number (yield read (Path.build_filename (path,
+                                                                        "charge_control_start_threshold"),
+                                                   cancellable));
+                sample.start_threshold = start >= 0 && start <= 100 ? start : -1;
                 string current = yield read (Path.build_filename (path, "current_now"),
                                              cancellable);
 

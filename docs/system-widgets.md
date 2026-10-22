@@ -17,7 +17,7 @@ its polling intervals through `widget-config`:
 
 The dashboard stacks full-width System, Battery, Wi-Fi and Bluetooth cards.
 Each card uses two internal columns: CPU beside RAM, with GPU beside VRAM on
-the following row, battery state/charge beside power/ETA, SSID beside signal
+the following row, battery Charge beside State above PWR beside ETA, SSID beside signal
 strength, and pairs of Bluetooth devices. Missing hardware cards hide. Volume and notifications
 follow at full width.
 Long network/device names ellipsize with full-name tooltips and separate
@@ -52,7 +52,12 @@ no system battery exists. Power comes from `power_now`, falling back to
 power, or charge with current. Charging requires a reported
 `charge_control_end_threshold` and targets that limit; discharging targets empty.
 Missing attributes, zero rates, paused charging and full batteries show `—`
-where a value cannot be estimated. No battery controls or writes are provided.
+where a value cannot be estimated. In the dashboard, Charge and State form the
+first row, with PWR and ETA below. The second row hides on external power when
+the battery is Full or Not charging at its reported limit (including the
+configured start/stop charge window). Without a reported limit, Not charging
+hides the row only at 100%. Charging, discharging and lower paused batteries
+keep the row visible. No battery controls or writes are provided.
 
 Wi-Fi uses NetworkManager's ObjectManager snapshot for the active wireless
 network and signal strength, or Off/Disconnected when an adapter is present.
