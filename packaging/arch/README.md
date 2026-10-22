@@ -13,8 +13,11 @@ the pinned source without changing `pkgver`, and update its archive checksum.
 
 ## Build and install
 
-Install Arch's `base-devel`, copy `PKGBUILD` to an empty temporary directory,
-then run there as the ordinary user:
+Install Arch's `base-devel` and the recipe's runtime dependencies first, then
+copy `PKGBUILD` to an empty temporary directory and run there as the ordinary
+user. Preinstalling runtime dependencies keeps `--rmdeps` from removing them
+before the separate package-install transaction. Chezmoi's package manifest
+already does this for selected hosts.
 
 ```sh
 rtk proxy makepkg --syncdeps --rmdeps --noconfirm
