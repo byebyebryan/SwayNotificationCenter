@@ -1,4 +1,13 @@
 namespace SwayNotificationCenter.Widgets.SystemData {
+    public string percentage (double value) {
+        if (!value.is_finite () || value < 0 || value > 100) {
+            return "—";
+        }
+        double rounded = Math.round (value);
+        // Figure space has a tabular digit's width, unlike an ordinary space.
+        return (rounded < 10 ? "\u2007" : "") + "%.0f%%".printf (rounded);
+    }
+
     public class CpuTimes : Object {
         public uint64 total;
         public uint64 idle;
@@ -97,6 +106,14 @@ namespace SwayNotificationCenter.Widgets.SystemData {
                 target = start_threshold;
             }
             return percentage >= target;
+        }
+
+        public string display_state () {
+            if (resting_on_external_power ()) {
+                return limit > 0 && limit < 100
+                    ? "At limit %.0f%%".printf (limit) : "Full";
+            }
+            return state;
         }
 
         public string eta () {

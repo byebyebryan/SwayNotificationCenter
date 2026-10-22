@@ -62,17 +62,18 @@ namespace SwayNotificationCenter.Widgets {
             previous = sample.cpu;
             string frequency = sample.frequency_ghz > 0
                 ? "%.1f GHz".printf (sample.frequency_ghz) : "—";
-            string utilization = usage >= 0 ? "%.0f%%".printf (usage) : "—";
+            string utilization = SystemData.percentage (usage);
             cpu_value.label = "%s · %s".printf (frequency, utilization);
             if (sample.memory_total_gib > 0) {
-                memory_value.label = "%.1f / %.1f GiB · %.0f%%".printf (
-                    sample.memory_used_gib, sample.memory_total_gib,
+                string memory_percentage = SystemData.percentage (
                     100 * sample.memory_used_gib / sample.memory_total_gib);
+                memory_value.label = "%.1f / %.1f GiB · %s".printf (
+                    sample.memory_used_gib, sample.memory_total_gib,
+                    memory_percentage);
                 memory_value.tooltip_text = memory_value.label;
                 if (compact) {
-                    memory_value.label = "%.1f GiB · %.0f%%".printf (sample.memory_used_gib,
-                                                                     100 * sample.memory_used_gib /
-                                                                     sample.memory_total_gib);
+                    memory_value.label = "%.1f GiB · %s".printf (sample.memory_used_gib,
+                                                                 memory_percentage);
                 }
             } else {
                 memory_value.label = "—";

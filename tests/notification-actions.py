@@ -206,9 +206,21 @@ def run(binary, client_test, dashboard_screenshot=None):
                 fake = {
                     "nm": {
                         "/org/freedesktop/NetworkManager": {"org.freedesktop.NetworkManager": {
-                            "WirelessEnabled": GLib.Variant("b", True)}},
+                            "PrimaryConnection": GLib.Variant("o", "/wifi_connection")}},
+                        "/wifi_connection": {"org.freedesktop.NetworkManager.Connection.Active": {
+                            "Devices": GLib.Variant("ao", ["/device"])}},
+                        "/ethernet_connection": {"org.freedesktop.NetworkManager.Connection.Active": {
+                            "Devices": GLib.Variant("ao", ["/ethernet_device"]),
+                            "Ip4Config": GLib.Variant("o", "/ethernet_ip")}},
+                        "/ethernet_device": {"org.freedesktop.NetworkManager.Device": {
+                            "State": GLib.Variant("u", 100), "DeviceType": GLib.Variant("u", 1),
+                            "Interface": GLib.Variant("s", "eth0")}},
+                        "/ethernet_ip": {"org.freedesktop.NetworkManager.IP4Config": {
+                            "AddressData": GLib.Variant("aa{sv}", [{"address": GLib.Variant("s", "192.0.2.10")}])}},
                         "/device": {
-                            "org.freedesktop.NetworkManager.Device": {"State": GLib.Variant("u", 100)},
+                            "org.freedesktop.NetworkManager.Device": {
+                                "State": GLib.Variant("u", 100), "DeviceType": GLib.Variant("u", 2),
+                                "Interface": GLib.Variant("s", "wlan0")},
                             "org.freedesktop.NetworkManager.Device.Wireless": {
                                 "ActiveAccessPoint": GLib.Variant("o", "/ap")}},
                         "/ap": {"org.freedesktop.NetworkManager.AccessPoint": {
@@ -248,6 +260,14 @@ def run(binary, client_test, dashboard_screenshot=None):
                                         "org.freedesktop.NetworkManager.AccessPoint",
                                         fake["nm"]["/ap"]["org.freedesktop.NetworkManager.AccessPoint"], [])))
 
+                def network_change(path, iface):
+                    bus.emit_signal(None, path, "org.freedesktop.DBus.Properties", "PropertiesChanged",
+                                    GLib.Variant("(sa{sv}as)", (iface, fake["nm"][path][iface], [])))
+
+                def network_sample():
+                    return [line for line in (root / "server.log").read_text().splitlines()
+                            if "network sample:" in line][-1]
+
                 def gpu_samples():
                     return (root / "server.log").read_text().count("gpu snapshot:")
 
@@ -281,6 +301,26 @@ def run(binary, client_test, dashboard_screenshot=None):
                         wifi_change()
                     pump(0.4)
                     assert calls == {"nm": before["nm"] + 1, "bt": before["bt"]}, calls
+                    manager_iface = "org.freedesktop.NetworkManager"
+                    manager_path = "/org/freedesktop/NetworkManager"
+                    fake["nm"][manager_path][manager_iface]["PrimaryConnection"] = GLib.Variant("o", "/ethernet_connection")
+                    network_change(manager_path, manager_iface)
+                    pump(0.4)
+                    assert "network sample: ETH 192.0.2.10" in network_sample(), "active Wi-Fi overrode primary Ethernet"
+                    if dashboard_screenshot:
+                        path = Path(dashboard_screenshot).resolve()
+                        subprocess.run(["niri", "msg", "action", "screenshot-screen", "--path",
+                                        str(path.with_stem(path.stem + "-ethernet"))], env=env, check=True,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                    fake["nm"]["/ethernet_ip"]["org.freedesktop.NetworkManager.IP4Config"]["AddressData"] = GLib.Variant(
+                        "aa{sv}", [{"address": GLib.Variant("s", "192.0.2.11")}])
+                    network_change("/ethernet_ip", "org.freedesktop.NetworkManager.IP4Config")
+                    pump(0.4)
+                    assert "network sample: ETH 192.0.2.11" in network_sample(), "IP change was not observed"
+                    fake["nm"][manager_path][manager_iface]["PrimaryConnection"] = GLib.Variant("o", "/wifi_connection")
+                    network_change(manager_path, manager_iface)
+                    pump(0.4)
+                    assert "network sample: WIFI A very long wireless network name" in network_sample(), "Wi-Fi did not return"
                     del fake["bt"]["/device3"]
                     bus.emit_signal(None, "/", "org.freedesktop.DBus.ObjectManager", "InterfacesRemoved",
                                     GLib.Variant("(oas)", ("/device3", ["org.bluez.Device1", "org.bluez.Battery1"])))
@@ -331,6 +371,7 @@ def run(binary, client_test, dashboard_screenshot=None):
                     call("SetVisibility", "(b)", (False,))
                     print(json.dumps({"result": "passed", "proof": "stacked dashboard lifecycle",
                                       "checks": ["nested refresh", "coalesced Wi-Fi signals", "Bluetooth removal",
+                                                 "primary Ethernet/Wi-Fi handover and IP change",
                                                  "empty Bluetooth hiding and reconnection",
                                                  "service restart", "open reload", "hidden idle", "removal cleanup"]}))
                 finally:

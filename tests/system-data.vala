@@ -28,6 +28,17 @@ void test_memory_frequency () {
     assert (number ("") == -1 && number (" ") == -1);
 }
 
+void test_percentages () {
+    assert (percentage (0) == "\u20070%");
+    assert (percentage (9) == "\u20079%");
+    assert (percentage (9.6) == "10%");
+    assert (percentage (10) == "10%");
+    assert (percentage (99) == "99%");
+    assert (percentage (100) == "100%");
+    assert (percentage (-1) == "—");
+    assert (percentage (101) == "—");
+}
+
 void test_eta () {
     var sample = new BatterySample ();
     sample.state = "Discharging";
@@ -61,19 +72,23 @@ void test_resting_battery () {
     assert (!sample.resting_on_external_power ());
     sample.external_power = true;
     assert (sample.resting_on_external_power ());
+    assert (sample.display_state () == "Full");
     sample.state = "Not charging";
     sample.percentage = 76;
     sample.limit = 80;
     assert (!sample.resting_on_external_power ());
     sample.start_threshold = 75;
     assert (sample.resting_on_external_power ());
+    assert (sample.display_state () == "At limit 80%");
     sample.percentage = 74;
     assert (!sample.resting_on_external_power ());
+    assert (sample.display_state () == "Not charging");
     sample.percentage = 80;
     sample.start_threshold = 90;
     assert (sample.resting_on_external_power ());
     sample.state = "Charging";
     assert (!sample.resting_on_external_power ());
+    assert (sample.display_state () == "Charging");
     sample.state = "Discharging";
     assert (!sample.resting_on_external_power ());
     sample.state = "Not charging";
@@ -85,6 +100,7 @@ void test_resting_battery () {
     assert (!sample.resting_on_external_power ());
     sample.percentage = 100;
     assert (sample.resting_on_external_power ());
+    assert (sample.display_state () == "Full");
     sample.percentage = -1;
     assert (!sample.resting_on_external_power ());
 }
@@ -186,6 +202,7 @@ int main (string[] args) {
     Test.init (ref args);
     Test.add_func ("/system-data/cpu", test_cpu);
     Test.add_func ("/system-data/memory-frequency", test_memory_frequency);
+    Test.add_func ("/system-data/percentages", test_percentages);
     Test.add_func ("/system-data/eta", test_eta);
     Test.add_func ("/system-data/resting-battery", test_resting_battery);
     Test.add_func ("/system-data/reader", test_reader);

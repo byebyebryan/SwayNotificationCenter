@@ -15,16 +15,19 @@ its polling intervals through `widget-config`:
 }
 ```
 
-The dashboard stacks full-width System, Battery, Wi-Fi and Bluetooth cards.
+The dashboard stacks full-width System, Battery, Network and Bluetooth cards.
 Each card uses two internal columns: CPU beside RAM, with GPU beside VRAM on
-the following row, battery Charge beside State above PWR beside ETA, SSID beside signal
-strength, and pairs of Bluetooth devices. Missing hardware cards hide. Volume and notifications
-follow at full width.
+the following row, battery Charge beside State above PWR beside ETA, Wi-Fi SSID
+beside signal strength, and pairs of Bluetooth devices. Ethernet instead uses a
+single full-width ETH/IP cell. Missing hardware cards hide. Volume and
+notifications follow at full width.
 Long network/device names ellipsize with full-name tooltips and separate
 percentages. Each Bluetooth cell has a device name on the left and battery
 percentage on the right (`—` when unreported). Bluetooth initially shows two
-connected devices, with expandable overflow that resets when the panel closes. Expanded devices fill further
-two-column rows.
+connected devices, with expandable overflow that resets when the panel closes.
+Expanded devices fill further two-column rows. Percentages reserve two digits
+with a figure space for single digits; tabular numerals keep their rendered
+width stable from 0 through 99 without leading zeroes. 100% remains supported.
 
 System shows average reported CPU frequency, utilization between samples,
 and used RAM in GiB with a percentage (total in its tooltip). RAM uses
@@ -40,8 +43,8 @@ only `active` allows a targeted `nvidia-smi` query and a visible GPU/VRAM row.
 Inactive, suspended and missing GPUs hide their rows; queries that fail on an
 active GPU show Unavailable. Cached-state checks continue while the open panel's
 GPU row is hidden so it can reappear without waking the device. The check
-reduces wakeups but cannot prevent a suspend/query race. The optional CLI has a one-second timeout;
-closing the panel kills and reaps an in-flight query. Other GPU vendors are not
+reduces wakeups but cannot prevent a suspend/query race. The optional CLI has a
+one-second timeout; closing the panel kills and reaps an in-flight query. Other GPU vendors are not
 queried. No NVIDIA package is required on systems without that hardware.
 
 Battery shows each present system battery's state, percentage, charge/discharge
@@ -57,10 +60,17 @@ first row, with PWR and ETA below. The second row hides on external power when
 the battery is Full or Not charging at its reported limit (including the
 configured start/stop charge window). Without a reported limit, Not charging
 hides the row only at 100%. Charging, discharging and lower paused batteries
-keep the row visible. No battery controls or writes are provided.
+keep the row visible. Resting batteries display `At limit 80%` for a reported
+limit below 100%, or `Full` otherwise; the raw driver state remains in the
+tooltip. No battery controls or writes are provided.
 
-Wi-Fi uses NetworkManager's ObjectManager snapshot for the active wireless
-network and signal strength, or Off/Disconnected when an adapter is present.
+Network uses NetworkManager's ObjectManager snapshot and `PrimaryConnection`,
+following the primary default link rather than any connected Wi-Fi adapter.
+Ethernet displays `ETH` with the link's IPv4 address, falling back to IPv6;
+Wi-Fi displays `WIFI` with the SSID and a separate Signal percentage. Other
+primary link types use `NET` with their address. A missing primary link shows
+Disconnected; a missing NetworkManager service hides the card. Long addresses
+and SSIDs ellipsize with a full-value tooltip, including interface and address.
 Bluetooth uses BlueZ's ObjectManager snapshot for connected device names and
 Battery1 percentages when available, including zero. The Bluetooth card hides
 when no devices are connected, retaining its subscriptions while the panel is
@@ -72,7 +82,7 @@ are observed. They never activate those services or request wireless scans.
 All reads are asynchronous. CPU/RAM, GPU and battery poll independently with at
 most one sample in flight per reader, only while the control center is open.
 Closing or replacing the dashboard cancels its reads, subprocess, timers and
-wireless subscriptions. Reloading configuration while open starts replacements
+network/Bluetooth subscriptions. Reloading configuration while open starts replacements
 immediately. No extra background daemon is needed. Debug logging includes samples
 and subscription lifecycle when `G_MESSAGES_DEBUG=swaync` is set.
 
@@ -88,5 +98,6 @@ Run the data/fixture tests with `meson test -C build --print-errorlogs`. The
 private compositor lifecycle check is `python tests/notification-actions.py
 --binary build/src/swaync`; it also protects the fork's retained action behavior.
 Add `--dashboard-screenshot /tmp/dashboard.png` to capture the private fixture
-with a long SSID and multiple Bluetooth devices. When the binary is in a Meson
+with a long SSID and multiple Bluetooth devices, plus an Ethernet variant in
+`/tmp/dashboard-ethernet.png`. When the binary is in a Meson
 build tree, the test uses that tree's compiled stylesheet.

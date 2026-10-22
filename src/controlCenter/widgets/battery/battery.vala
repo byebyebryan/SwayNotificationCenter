@@ -57,11 +57,10 @@ namespace SwayNotificationCenter.Widgets {
             }
 
             public void update (SystemData.BatterySample sample) {
-                string percentage = sample.percentage >= 0
-                    ? "%.0f%%".printf (sample.percentage) : "—";
-                status.label = "%s · %s".printf (sample.state, percentage);
+                string percentage = SystemData.percentage (sample.percentage);
+                status.label = "%s · %s".printf (sample.display_state (), percentage);
                 if (charge != null) {
-                    status.label = sample.state;
+                    status.label = sample.display_state ();
                     charge.label = percentage;
                 }
                 power.label = sample.power >= 0 ? "%.1f W".printf (sample.power / 1000000) : "—";

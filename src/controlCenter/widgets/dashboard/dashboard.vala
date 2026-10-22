@@ -10,7 +10,7 @@ namespace SwayNotificationCenter.Widgets {
             orientation = Gtk.Orientation.VERTICAL;
             spacing = 12;
             cards = { new SystemStats (suffix, true), new Battery (suffix, true),
-                      new Wifi (suffix), new Bluetooth (suffix) };
+                      new Network (suffix), new Bluetooth (suffix) };
             for (int i = 0; i < cards.length; i++) {
                 cards[i].add_css_class ("dashboard-card");
                 cards[i].hexpand = true;
@@ -102,10 +102,15 @@ namespace SwayNotificationCenter.Widgets {
                 if (sample.state == "Active") {
                     string clock = sample.clock >=
                         0 ? "%.1f GHz".printf (sample.clock / 1000) : "—";
-                    gpu_values[i].label = "%s · %.0f%%".printf (clock, sample.utilization);
-                    memory_values[i].label = "%.1f GiB · %.0f%%".printf (sample.used / 1024,
-                                                                         100 * sample.used /
-                                                                         sample.total);
+                    gpu_values[i].label = "%s · %s".printf (clock,
+                                                            SystemData.percentage (
+                                                                sample.utilization));
+                    memory_values[i].label = "%.1f GiB · %s".printf (sample.used / 1024,
+                                                                     SystemData.percentage (100 *
+                                                                                            sample.
+                                                                                             used /
+                                                                                            sample.
+                                                                                             total));
                     memory_values[i].tooltip_text = "%.1f / %.1f GiB".printf (sample.used / 1024,
                                                                               sample.total / 1024);
                 }
@@ -115,16 +120,18 @@ namespace SwayNotificationCenter.Widgets {
         }
     }
 
-    public class Wifi : BusWidget {
+    public class Network : BusWidget {
         public override string widget_name { get {
-                                                 return "wifi";
+                                                 return "network";
                                              } }
         Gtk.Label network_name;
+        Gtk.Label network_label;
         Gtk.Label strength;
+        Gtk.Box signal_row;
 
-        public Wifi (string suffix) {
+        public Network (string suffix) {
             base (suffix, "org.freedesktop.NetworkManager", "/org/freedesktop");
-            add_heading ("Wi-Fi");
+            add_heading ("Network");
             var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
             row.homogeneous = true;
             network_name = new Gtk.Label ("—");
@@ -134,7 +141,7 @@ namespace SwayNotificationCenter.Widgets {
             network_name.max_width_chars = 1;
             network_name.add_css_class ("metric-value");
             var network_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
-            var network_label = new Gtk.Label ("SSID");
+            network_label = new Gtk.Label ("NET");
             network_label.add_css_class ("metric-label");
             network_row.append (network_label);
             network_row.append (network_name);
@@ -142,7 +149,7 @@ namespace SwayNotificationCenter.Widgets {
             strength.xalign = 1;
             strength.hexpand = true;
             strength.add_css_class ("metric-value");
-            var signal_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+            signal_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
             var signal_label = new Gtk.Label ("Signal");
             signal_label.add_css_class ("metric-label");
             signal_row.append (signal_label);
@@ -154,17 +161,31 @@ namespace SwayNotificationCenter.Widgets {
 
         protected override bool watches_interface (string iface) {
             return iface in new string[] { "org.freedesktop.NetworkManager",
+                                           "org.freedesktop.NetworkManager.Connection.Active",
                                            "org.freedesktop.NetworkManager.Device",
+                                           "org.freedesktop.NetworkManager.Device.Wired",
                                            "org.freedesktop.NetworkManager.Device.Wireless",
-                                           "org.freedesktop.NetworkManager.AccessPoint" };
+                                           "org.freedesktop.NetworkManager.AccessPoint",
+                                           "org.freedesktop.NetworkManager.IP4Config",
+                                           "org.freedesktop.NetworkManager.IP6Config" };
         }
 
         protected override void apply_snapshot (Variant ?objects) {
-            var sample = WirelessData.WifiSample.parse (objects);
-            network_name.label = sample.state == "Connected" ? sample.ssid : sample.state;
-            network_name.tooltip_text = network_name.label;
-            strength.label = sample.strength >= 0 ? "%d%%".printf (sample.strength) : "—";
+            var sample = WirelessData.NetworkSample.parse (objects);
+            network_label.label = sample.kind;
+            network_name.label = sample.state == "Connected" ? sample.name : sample.state;
+            string tooltip = network_name.label;
+            if (sample.interface_name != "") {
+                tooltip += " · " + sample.interface_name;
+            }
+            if (sample.address != "" && sample.address != network_name.label) {
+                tooltip += " · " + sample.address;
+            }
+            network_name.tooltip_text = tooltip;
+            strength.label = SystemData.percentage (sample.strength);
+            signal_row.visible = sample.kind == "WIFI";
             visible = sample.present;
+            debug ("network sample: %s %s", sample.kind, network_name.label);
         }
     }
 
@@ -227,8 +248,7 @@ namespace SwayNotificationCenter.Widgets {
                 label.tooltip_text = entry.name;
                 label.add_css_class ("metric-label");
                 row.append (label);
-                var percentage = new Gtk.Label (entry.battery >=
-                                                0 ? "%d%%".printf (entry.battery) : "—");
+                var percentage = new Gtk.Label (SystemData.percentage (entry.battery));
                 percentage.xalign = 1;
                 percentage.add_css_class ("metric-value");
                 percentage.tooltip_text = entry.battery >= 0 ? "Battery" : "Battery not reported";

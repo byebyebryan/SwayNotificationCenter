@@ -446,7 +446,7 @@
     "$comment": "New widgets go here",
     "dashboard": {
       "type": "object",
-      "description": "Stacked full-width system, battery, Wi-Fi and Bluetooth cards with two internal columns; absent hardware, inactive GPU rows and empty Bluetooth cards are hidden",
+      "description": "Stacked system, battery, primary-network and Bluetooth cards with two internal columns; absent hardware, inactive GPU rows and empty Bluetooth cards are hidden",
       "additionalProperties": false,
       "properties": {}
     },

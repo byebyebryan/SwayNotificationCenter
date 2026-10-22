@@ -8,28 +8,55 @@ Variant objects (string text) {
     }
 }
 
-void test_wifi () {
+void test_network () {
     string fixture = "{" +
-        "'/org/freedesktop/NetworkManager': {'org.freedesktop.NetworkManager': {'WirelessEnabled': <true>}},"
+        "'/org/freedesktop/NetworkManager': {'org.freedesktop.NetworkManager': {'PrimaryConnection': <objectpath '/wifi_connection'>}},"
         +
-        "'/device': {'org.freedesktop.NetworkManager.Device': {'State': <uint32 100>}," +
+        "'/wifi_connection': {'org.freedesktop.NetworkManager.Connection.Active': {'Devices': <[objectpath '/wifi_device']>, 'Ip4Config': <objectpath '/wifi_ip'>}},"
+        +
+        "'/ethernet_connection': {'org.freedesktop.NetworkManager.Connection.Active': {'Devices': <[objectpath '/ethernet_device']>, 'Ip4Config': <objectpath '/ethernet_ip'>, 'Ip6Config': <objectpath '/ipv6'>}},"
+        +
+        "'/wifi_device': {'org.freedesktop.NetworkManager.Device': {'State': <uint32 100>, 'DeviceType': <uint32 2>, 'Interface': <'wlan0'>},"
+        +
         "'org.freedesktop.NetworkManager.Device.Wireless': {'ActiveAccessPoint': <objectpath '/ap'>}},"
         +
+        "'/ethernet_device': {'org.freedesktop.NetworkManager.Device': {'State': <uint32 100>, 'DeviceType': <uint32 1>, 'Interface': <'eth0'>}},"
+        +
+        "'/wifi_ip': {'org.freedesktop.NetworkManager.IP4Config': {'AddressData': <[{'address': <'192.0.2.20'>}]>}},"
+        +
+        "'/ethernet_ip': {'org.freedesktop.NetworkManager.IP4Config': {'AddressData': <[{'address': <'192.0.2.10'>}]>}},"
+        +
+        "'/ipv6': {'org.freedesktop.NetworkManager.IP6Config': {'AddressData': <[{'address': <'fe80::1'>}, {'address': <'2001:db8::1'>}]>}},"
+        +
         "'/ap': {'org.freedesktop.NetworkManager.AccessPoint': {'Ssid': <[byte 0x57, 0x69, 0x00, 0x46, 0x69]>, 'Strength': <byte 77>}}}";
-    var wifi = WirelessData.WifiSample.parse (objects (fixture));
-    assert (wifi.present && wifi.state == "Connected" && wifi.ssid == "Wi Fi" &&
-            wifi.strength == 77);
-    wifi = WirelessData.WifiSample.parse (objects (fixture.replace ("uint32 100", "uint32 30")));
-    assert (wifi.present && wifi.state == "Disconnected" && wifi.strength == -1);
-    wifi = WirelessData.WifiSample.parse (objects (fixture.replace ("uint32 100",
-                                                                    "uint32 30").replace ("<true>",
-                                                                                          "<false>")));
-    assert (wifi.state == "Off");
-    wifi = WirelessData.WifiSample.parse (objects (fixture.replace ("byte 77", "byte 255")));
-    assert (wifi.strength == -1);
-    assert (!WirelessData.WifiSample.parse (objects ("{}")).present);
-    assert (!WirelessData.WifiSample.parse (null).present);
-    assert (!WirelessData.WifiSample.parse (new Variant.string ("invalid")).present);
+    var network = WirelessData.NetworkSample.parse (objects (fixture));
+    assert (network.present && network.state == "Connected" && network.kind == "WIFI");
+    assert (network.name == "Wi Fi" && network.strength == 77 && network.interface_name == "wlan0");
+    assert (network.address == "192.0.2.20");
+    network = WirelessData.NetworkSample.parse (objects (fixture.replace ("byte 77", "byte 255")));
+    assert (network.strength == -1);
+    network = WirelessData.NetworkSample.parse (objects (fixture.replace ("uint32 100",
+                                                                          "uint32 30")));
+    assert (network.present && network.state == "Disconnected" && network.strength == -1);
+    string ethernet = fixture.replace ("'PrimaryConnection': <objectpath '/wifi_connection'>",
+                                       "'PrimaryConnection': <objectpath '/ethernet_connection'>");
+    network = WirelessData.NetworkSample.parse (objects (ethernet));
+    assert (network.kind == "ETH" && network.name == "192.0.2.10" && network.strength == -1);
+    assert (network.interface_name == "eth0");
+    network = WirelessData.NetworkSample.parse (objects (ethernet.replace ("192.0.2.10",
+                                                                           "invalid")));
+    assert (network.name == "2001:db8::1");
+    network = WirelessData.NetworkSample.parse (objects (ethernet.replace ("uint32 1>",
+                                                                           "uint32 20>")));
+    assert (network.kind == "NET" && network.name == "192.0.2.10");
+    network =
+        WirelessData.NetworkSample.parse (objects (fixture.replace (
+                                                       "'PrimaryConnection': <objectpath '/wifi_connection'>",
+                                                       "'PrimaryConnection': <objectpath '/'>")));
+    assert (network.present && network.state == "Disconnected");
+    assert (!WirelessData.NetworkSample.parse (objects ("{}")).present);
+    assert (!WirelessData.NetworkSample.parse (null).present);
+    assert (!WirelessData.NetworkSample.parse (new Variant.string ("invalid")).present);
 }
 
 void test_bluetooth () {
@@ -149,7 +176,7 @@ void test_gpu () {
 
 int main (string[] args) {
     Test.init (ref args);
-    Test.add_func ("/dashboard/wifi", test_wifi);
+    Test.add_func ("/dashboard/network", test_network);
     Test.add_func ("/dashboard/bluetooth", test_bluetooth);
     Test.add_func ("/dashboard/gpu", test_gpu);
     return Test.run ();
