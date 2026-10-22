@@ -439,13 +439,11 @@ namespace SwayNotificationCenter {
             }
             if (param.default_action != null
                 && param.default_action.identifier == identifier) {
-                action_clicked (param.default_action, activation_token);
-                return true;
+                return action_clicked (param.default_action, activation_token);
             }
             foreach (unowned Action action in param.actions.data) {
                 if (action.identifier == identifier) {
-                    action_clicked (action, activation_token);
-                    return true;
+                    return action_clicked (action, activation_token);
                 }
             }
             return false;
@@ -482,7 +480,8 @@ namespace SwayNotificationCenter {
             action_clicked (param.actions.index (index));
         }
 
-        private void action_clicked (Action ?action, string ?activation_token = null) {
+        private bool action_clicked (Action ?action, string ?activation_token = null) {
+            bool dispatched = false;
             noti_daemon.run_scripts (param, ScriptRunOnType.ACTION);
             if (action != null
                 && action.identifier != null
@@ -493,11 +492,7 @@ namespace SwayNotificationCenter {
                 if (token == null || token.length == 0) {
                     token = app.xdg_activation.get_token (this);
                 }
-                if (token != null) {
-                    noti_daemon.ActivationToken (param.applied_id, token);
-                }
-
-                noti_daemon.ActionInvoked (param.applied_id, action.identifier);
+                dispatched = noti_daemon.send_action (param, action.identifier, token);
                 if (ConfigModel.instance.hide_on_action) {
                     try {
                         swaync_daemon.set_visibility (false);
@@ -509,6 +504,7 @@ namespace SwayNotificationCenter {
             if (!param.resident) {
                 request_dismiss_notification (ClosedReasons.DISMISSED, false);
             }
+            return dispatched;
         }
 
         private void set_style_urgency () {

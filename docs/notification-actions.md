@@ -21,7 +21,7 @@ revision, and supply it when invoking its exact action key. An unknown or closed
 ID returns `unavailable`; a replaced revision returns `stale`. Missing actions
 do not dismiss the notification, run scripts, or substitute another action.
 There is no latest-notification fallback. The existing latest-popup methods
-and desktop click behavior retain their previous semantics.
+and desktop click behavior retain their action selection and token semantics.
 
 The server checks revision and invokes the current widget's action in one GTK
 main-loop turn. Dispatch uses the same action, activation-token helper, scripts,
@@ -41,6 +41,15 @@ using a short-lived non-graphical relay, rather than weakening focus policy.
 Pin requests to the notification server's unique D-Bus owner, and invalidate
 cached snapshots when that owner changes. Numeric IDs are reused after daemon
 restart; old revisions never authorize a new notification at the same ID.
+Each Notify also captures its unique originating D-Bus connection using the
+bus-supplied sender, never an application hint. Both `ActivationToken` and
+`ActionInvoked` are directed to that connection, for desktop clicks and remote
+Open alike. They are never broadcast. A surviving application may retain stale
+numeric IDs across a daemon restart; it cannot receive another client's action
+when those IDs are reused. Replacements take the current Notify sender, and a
+missing origin never falls back to broadcasting. Ordinary subscribers therefore
+cannot observe another client's actions; actual bus monitors remain independent.
+
 Explicitly dismissed, sender-closed, and expired transient notifications cannot
 be invoked. This API does not persist application callbacks across restarts.
 
@@ -53,12 +62,17 @@ and a disposable Niri compositor nested inside Xvfb:
 python3 tests/notification-actions.py --binary build/src/swaync
 ```
 
-Requires Niri, Xvfb, and Python GObject introspection. The harness has no service
+Requires Kitty, Niri, Xvfb, and Python GObject introspection. The harness has no service
 activation directories, uses private configuration/runtime/state paths, and does
 not touch the running desktop notifier or compositor. It tests an older expired
 card with a newer popup present, exact/missing actions, identical and synchronous
 replacement, explicit close, transient expiry, resident handling, and ID reuse
-after server restart. `--client-test COMMAND...` optionally runs another native
+after server restart. An unrelated subscriber must receive no token or action;
+an identical cross-client replacement must address only its new origin. Three
+real Kitty processes then remain alive across a SwayNC restart: an old and a new
+notification reuse numeric ID 1, but only the new origin may request focus.
+This catches stale client mappings that a daemon-only restart test misses.
+`--client-test COMMAND...` optionally runs another native
 client against that same disposable server.
 
 ## Packaging

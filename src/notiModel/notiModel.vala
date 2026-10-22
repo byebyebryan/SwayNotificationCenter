@@ -74,6 +74,9 @@ namespace SwayNotificationCenter {
         // A new Notify call always creates a new revision, including an
         // identical replacement. Never derive action identity from its text.
         public string action_revision { get; private set; }
+        // Unique bus connection that submitted this exact Notify call.
+        // Numeric IDs alone can collide in surviving clients after restart.
+        public string ?sender { get; private set; }
         public string app_name { get; private set; }
         public uint32 replaces_id { get; private set; }
         public string app_icon { get; private set; }
@@ -179,9 +182,11 @@ namespace SwayNotificationCenter {
                              string body,
                              string[] actions,
                              HashTable<string, Variant> hints,
-                             int expire_timeout) {
+                             int expire_timeout,
+                             string ?sender = null) {
             this.applied_id = applied_id;
             this.action_revision = Uuid.string_random ();
+            this.sender = sender;
             this.app_name = app_name;
             this.replaces_id = replaces_id;
             this.app_icon = Uri.unescape_string (app_icon);

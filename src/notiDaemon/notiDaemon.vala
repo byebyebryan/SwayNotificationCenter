@@ -5,6 +5,7 @@ namespace SwayNotificationCenter {
     [DBus (name = "org.freedesktop.Notifications")]
     public class NotiDaemon : Object {
         private uint32 noti_id = 0;
+        private DBusConnection connection;
         private HashTable<string, uint32> synchronous_ids =
             new HashTable<string, uint32> (str_hash, str_equal);
         private Gee.HashSet<uint32> notification_ids = new Gee.HashSet<uint32> ();
@@ -14,7 +15,8 @@ namespace SwayNotificationCenter {
         /** Called when Do Not Disturb state changes */
         internal signal void on_dnd_toggle (bool dnd);
 
-        public NotiDaemon () {
+        public NotiDaemon (DBusConnection connection) {
+            this.connection = connection;
             this.notify["dnd"].connect (() => on_dnd_toggle (dnd));
 
             // Init dnd from gsettings
@@ -184,6 +186,29 @@ namespace SwayNotificationCenter {
             return notification.invoke_action (action_key, activation_token) ? "dispatched" : "unavailable";
         }
 
+        internal bool send_action (NotifyParams param, string action_key, string ?token) {
+            // Never broadcast an action or focus token: applications can retain
+            // stale numeric IDs across a notification-daemon restart. A unique
+            // connection name cannot be reassigned to another client on this bus.
+            if (param.sender == null || !param.sender.has_prefix (":")) {
+                return false;
+            }
+            try {
+                if (token != null) {
+                    connection.emit_signal (param.sender, "/org/freedesktop/Notifications",
+                                            "org.freedesktop.Notifications", "ActivationToken",
+                                            new Variant ("(us)", param.applied_id, token));
+                }
+                connection.emit_signal (param.sender, "/org/freedesktop/Notifications",
+                                        "org.freedesktop.Notifications", "ActionInvoked",
+                                        new Variant ("(us)", param.applied_id, action_key));
+                return true;
+            } catch (Error e) {
+                warning ("Could not send notification action: %s", e.message);
+                return false;
+            }
+        }
+
         /*
          * D-Bus Specification
          * https://specifications.freedesktop.org/notification-spec/latest/ar01s09.html
@@ -234,7 +259,8 @@ namespace SwayNotificationCenter {
                                         string body,
                                         string[] actions,
                                         HashTable<string, Variant> hints,
-                                        int expire_timeout) throws DBusError, IOError {
+                                        int expire_timeout,
+                                        GLib.BusName ?sender = null) throws DBusError, IOError {
             uint32 id = replaces_id;
             if (replaces_id == 0 || replaces_id > noti_id) {
                 id = ++noti_id;
@@ -250,7 +276,8 @@ namespace SwayNotificationCenter {
                 body,
                 actions,
                 hints,
-                expire_timeout);
+                expire_timeout,
+                sender);
 
             debug ("Notification (ID:%u, state: %s): %s\n",
                    param.applied_id, param.status_state.to_string (), param.to_string ());
