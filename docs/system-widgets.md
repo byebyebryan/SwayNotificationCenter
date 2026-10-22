@@ -18,8 +18,9 @@ its polling intervals through `widget-config`:
 The dashboard stacks full-width System, Battery, Network and Bluetooth cards.
 Each card uses two internal columns: CPU beside RAM, with GPU beside VRAM on
 the following row, battery Charge beside State above PWR beside ETA, Wi-Fi SSID
-beside signal strength, and pairs of Bluetooth devices. Ethernet instead uses a
-single full-width ETH/IP cell. Missing hardware cards hide. Volume and
+beside signal strength, and pairs of Bluetooth devices. Ethernet uses the first
+half-width ETH/IP cell and leaves the second empty. A lone Bluetooth device
+also keeps its cell at half width. Missing hardware cards hide. Volume and
 notifications follow at full width.
 Long network/device names ellipsize with full-name tooltips and separate
 percentages. Each Bluetooth cell has a device name on the left and battery

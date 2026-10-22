@@ -154,8 +154,12 @@ namespace SwayNotificationCenter.Widgets {
             signal_label.add_css_class ("metric-label");
             signal_row.append (signal_label);
             signal_row.append (strength);
+            // Keep the second column allocated when its Wi-Fi content is hidden.
+            var signal_cell = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0);
+            signal_row.hexpand = true;
+            signal_cell.append (signal_row);
             row.append (network_row);
-            row.append (signal_row);
+            row.append (signal_cell);
             append (row);
         }
 
@@ -237,7 +241,8 @@ namespace SwayNotificationCenter.Widgets {
                 devices.remove (child);
             }
             int count = (int) sample.devices.length;
-            for (int i = 0; i < (expanded ? count : int.min (count, 2)); i++) {
+            int shown = expanded ? count : int.min (count, 2);
+            for (int i = 0; i < shown; i++) {
                 var entry = sample.devices[i];
                 var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
                 var label = new Gtk.Label (entry.name);
@@ -254,6 +259,9 @@ namespace SwayNotificationCenter.Widgets {
                 percentage.tooltip_text = entry.battery >= 0 ? "Battery" : "Battery not reported";
                 row.append (percentage);
                 devices.attach (row, i % 2, i / 2);
+            }
+            if (shown % 2 != 0) {
+                devices.attach (new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0), 1, shown / 2);
             }
             more.visible = count > 2;
             more.label = expanded ? "Show less" : "+%d more".printf (count - 2);
