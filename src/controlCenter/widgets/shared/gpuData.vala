@@ -2,6 +2,7 @@ namespace SwayNotificationCenter.Widgets.GpuData {
     public class Sample : Object {
         public string pci;
         public string state = "Unavailable";
+        public bool runtime_active = false;
         public double clock = -1;
         public double utilization = -1;
         public double used = -1;
@@ -133,6 +134,7 @@ namespace SwayNotificationCenter.Widgets.GpuData {
                 if (state == "suspended" || state == "suspending") {
                     sample.state = "Asleep";
                 } else if (state == "active") {
+                    sample.runtime_active = true;
                     yield query (sample, cancellable);
                 }
                 samples.add (sample);

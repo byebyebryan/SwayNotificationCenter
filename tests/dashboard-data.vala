@@ -84,15 +84,18 @@ async void check_gpu (string root) throws Error {
     var samples = yield reader.samples (token);
 
     assert (samples.length == 1 && samples[0].state == "Asleep");
+    assert (!samples[0].runtime_active);
     assert (!FileUtils.test (calls, FileTest.EXISTS));
     write_fixture (root, path + "/power/runtime_status", "resuming");
     samples = yield reader.samples (token);
 
     assert (samples[0].state == "Unavailable" && !FileUtils.test (calls, FileTest.EXISTS));
+    assert (!samples[0].runtime_active);
     write_fixture (root, path + "/power/runtime_status", "active");
     samples = yield reader.samples (token);
 
     assert (samples[0].state == "Active" && samples[0].clock == 1200);
+    assert (samples[0].runtime_active);
     assert (samples[0].utilization == 15 && samples[0].used == 1024 && samples[0].total == 8192);
     string arguments;
     FileUtils.get_contents (calls, out arguments);
@@ -111,6 +114,7 @@ async void check_gpu (string root) throws Error {
     samples = yield reader.samples (token);
 
     assert (get_monotonic_time () - started < 2500000 && samples[0].state == "Unavailable");
+    assert (samples[0].runtime_active);
     string pid;
     FileUtils.get_contents (root + "/pid", out pid);
     assert (!FileUtils.test ("/proc/" + pid, FileTest.EXISTS));

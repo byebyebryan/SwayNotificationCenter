@@ -251,6 +251,11 @@ def run(binary, client_test, dashboard_screenshot=None):
                 def gpu_samples():
                     return (root / "server.log").read_text().count("gpu snapshot:")
 
+                def bluetooth_visible():
+                    lines = [line for line in (root / "server.log").read_text().splitlines()
+                             if "bluetooth devices:" in line]
+                    return lines[-1].endswith("visible: true")
+
                 try:
                     pump(0.1)
                     dashboard_config = dict(original_config, widgets=["dashboard", "notifications"],
@@ -281,6 +286,17 @@ def run(binary, client_test, dashboard_screenshot=None):
                                     GLib.Variant("(oas)", ("/device3", ["org.bluez.Device1", "org.bluez.Battery1"])))
                     pump(0.4)
                     assert calls["bt"] == before["bt"] + 1, calls
+                    saved_devices = fake["bt"]
+                    fake["bt"] = {"/adapter": saved_devices["/adapter"]}
+                    bus.emit_signal(None, "/", "org.freedesktop.DBus.ObjectManager", "InterfacesRemoved",
+                                    GLib.Variant("(oas)", ("/device0", ["org.bluez.Device1"])))
+                    pump(0.4)
+                    assert not bluetooth_visible(), "empty Bluetooth card stayed visible"
+                    fake["bt"] = saved_devices
+                    bus.emit_signal(None, "/", "org.freedesktop.DBus.ObjectManager", "InterfacesAdded",
+                                    GLib.Variant("(oa{sa{sv}})", ("/device0", saved_devices["/device0"])))
+                    pump(0.4)
+                    assert bluetooth_visible(), "hidden Bluetooth card stopped observing connections"
                     before = calls.copy()
                     call("ReloadConfig", "()", ())
                     pump(0.4)
@@ -291,9 +307,11 @@ def run(binary, client_test, dashboard_screenshot=None):
                     assert calls["nm"] == before["nm"] + 1, "reload leaked wireless subscriptions"
                     Gio.bus_unown_name(owners.pop())
                     pump(0.4)
+                    assert not bluetooth_visible(), "Bluetooth service loss retained stale devices"
                     owners.append(Gio.bus_own_name_on_connection(bus, "org.bluez", Gio.BusNameOwnerFlags.NONE, None, None))
                     pump(0.4)
                     assert calls["bt"] == before["bt"] + 1, "Bluetooth service restart did not refresh"
+                    assert bluetooth_visible(), "Bluetooth card did not recover after service restart"
                     call("SetVisibility", "(b)", (False,))
                     pump(0.1)
                     before = calls.copy(); before_gpu = gpu_samples(); before_cpu = sample_counts()
@@ -313,6 +331,7 @@ def run(binary, client_test, dashboard_screenshot=None):
                     call("SetVisibility", "(b)", (False,))
                     print(json.dumps({"result": "passed", "proof": "stacked dashboard lifecycle",
                                       "checks": ["nested refresh", "coalesced Wi-Fi signals", "Bluetooth removal",
+                                                 "empty Bluetooth hiding and reconnection",
                                                  "service restart", "open reload", "hidden idle", "removal cleanup"]}))
                 finally:
                     for owner in owners:

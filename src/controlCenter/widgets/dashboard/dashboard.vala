@@ -35,7 +35,7 @@ namespace SwayNotificationCenter.Widgets {
                                                  return "gpu";
                                              } }
         GpuData.Reader reader = new GpuData.Reader ();
-        Gtk.Grid grid = new Gtk.Grid ();
+        Gtk.Box rows = new Gtk.Box (Gtk.Orientation.VERTICAL, 8);
         string identity = "";
         Gtk.Label[] gpu_values = {};
         Gtk.Label[] memory_values = {};
@@ -43,19 +43,28 @@ namespace SwayNotificationCenter.Widgets {
         public GpuStats (string suffix) {
             base (suffix);
             configure_interval (2);
-            grid.column_spacing = 6;
-            grid.row_spacing = 8;
-            grid.hexpand = true;
-            append (grid);
+            rows.hexpand = true;
+            append (rows);
+            visible = false;
+        }
+
+        protected override void reset_sample () {
             visible = false;
         }
 
         protected override async void update_sample (Cancellable cancellable) {
-            var samples = yield reader.samples (cancellable);
+            var readings = yield reader.samples (cancellable);
 
             if (cancellable.is_cancelled ()) {
                 return;
             }
+            var active = new GenericArray<GpuData.Sample> ();
+            foreach (var sample in readings) {
+                if (sample.runtime_active) {
+                    active.add (sample);
+                }
+            }
+            var samples = active.data;
             string key = "";
             foreach (var sample in samples) {
                 key += sample.pci + ";";
@@ -63,15 +72,25 @@ namespace SwayNotificationCenter.Widgets {
             if (key != identity) {
                 identity = key;
                 Gtk.Widget ?child;
-                while ((child = grid.get_first_child ()) != null) {
-                    grid.remove (child);
+                while ((child = rows.get_first_child ()) != null) {
+                    rows.remove (child);
                 }
                 gpu_values = {};
                 memory_values = {};
                 for (int i = 0; i < samples.length; i++) {
                     string suffix = samples.length > 1 ? " %d".printf (i + 1) : "";
-                    gpu_values += add_metric (grid, i * 2, "GPU" + suffix);
-                    memory_values += add_metric (grid, i * 2 + 1, "VRAM" + suffix);
+                    var columns = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
+                    columns.homogeneous = true;
+                    columns.hexpand = true;
+                    var graphics = new Gtk.Grid ();
+                    var memory = new Gtk.Grid ();
+                    graphics.column_spacing = memory.column_spacing = 6;
+                    graphics.hexpand = memory.hexpand = true;
+                    gpu_values += add_metric (graphics, 0, "GPU" + suffix);
+                    memory_values += add_metric (memory, 0, "VRAM" + suffix);
+                    columns.append (graphics);
+                    columns.append (memory);
+                    rows.append (columns);
                 }
             }
             for (int i = 0; i < samples.length; i++) {
@@ -92,7 +111,7 @@ namespace SwayNotificationCenter.Widgets {
                 }
             }
             visible = samples.length > 0;
-            debug ("gpu snapshot: %d devices", samples.length);
+            debug ("gpu snapshot: %d active of %d devices", samples.length, readings.length);
         }
     }
 
@@ -109,10 +128,16 @@ namespace SwayNotificationCenter.Widgets {
             var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
             row.homogeneous = true;
             network_name = new Gtk.Label ("—");
-            network_name.xalign = 0;
+            network_name.xalign = 1;
             network_name.hexpand = true;
             network_name.ellipsize = Pango.EllipsizeMode.END;
             network_name.max_width_chars = 1;
+            network_name.add_css_class ("metric-value");
+            var network_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6);
+            var network_label = new Gtk.Label ("SSID");
+            network_label.add_css_class ("metric-label");
+            network_row.append (network_label);
+            network_row.append (network_name);
             strength = new Gtk.Label ("");
             strength.xalign = 1;
             strength.hexpand = true;
@@ -122,7 +147,7 @@ namespace SwayNotificationCenter.Widgets {
             signal_label.add_css_class ("metric-label");
             signal_row.append (signal_label);
             signal_row.append (strength);
-            row.append (network_name);
+            row.append (network_row);
             row.append (signal_row);
             append (row);
         }
@@ -177,7 +202,9 @@ namespace SwayNotificationCenter.Widgets {
         protected override void apply_snapshot (Variant ?objects) {
             sample = WirelessData.BluetoothSample.parse (objects);
             rebuild ();
-            visible = sample.present;
+            visible = sample.devices.length > 0;
+            debug ("bluetooth devices: %u; visible: %s", sample.devices.length,
+                   visible.to_string ());
         }
 
         void rebuild () {
@@ -187,12 +214,6 @@ namespace SwayNotificationCenter.Widgets {
             Gtk.Widget ?child;
             while ((child = devices.get_first_child ()) != null) {
                 devices.remove (child);
-            }
-            if (sample.devices.length == 0) {
-                var label = new Gtk.Label (sample.powered ? "No devices connected" : "Off");
-                label.xalign = 0;
-                label.wrap = true;
-                devices.attach (label, 0, 0, 2);
             }
             int count = (int) sample.devices.length;
             for (int i = 0; i < (expanded ? count : int.min (count, 2)); i++) {
@@ -204,12 +225,14 @@ namespace SwayNotificationCenter.Widgets {
                 label.max_width_chars = 1;
                 label.ellipsize = Pango.EllipsizeMode.END;
                 label.tooltip_text = entry.name;
+                label.add_css_class ("metric-label");
                 row.append (label);
-                if (entry.battery >= 0) {
-                    var percentage = new Gtk.Label ("%d%%".printf (entry.battery));
-                    percentage.add_css_class ("metric-value");
-                    row.append (percentage);
-                }
+                var percentage = new Gtk.Label (entry.battery >=
+                                                0 ? "%d%%".printf (entry.battery) : "—");
+                percentage.xalign = 1;
+                percentage.add_css_class ("metric-value");
+                percentage.tooltip_text = entry.battery >= 0 ? "Battery" : "Battery not reported";
+                row.append (percentage);
                 devices.attach (row, i % 2, i / 2);
             }
             more.visible = count > 2;

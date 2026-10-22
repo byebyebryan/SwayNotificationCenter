@@ -18,24 +18,30 @@ namespace SwayNotificationCenter.Widgets {
                 add_heading ("System");
             }
             configure_interval (1);
-            var grid = new Gtk.Grid ();
-            grid.column_spacing = compact ? 6 : 16;
-            grid.row_spacing = 8;
-            grid.hexpand = true;
-            cpu_value = add_metric (grid, 0, "CPU");
-            memory_value = add_metric (grid, 1, "RAM");
             if (compact) {
                 var columns = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
                 columns.homogeneous = true;
                 columns.hexpand = true;
-                grid.valign = Gtk.Align.START;
+                var cpu = new Gtk.Grid ();
+                var memory = new Gtk.Grid ();
+                cpu.column_spacing = memory.column_spacing = 6;
+                cpu.hexpand = memory.hexpand = true;
+                cpu_value = add_metric (cpu, 0, "CPU");
+                memory_value = add_metric (memory, 0, "RAM");
+                columns.append (cpu);
+                columns.append (memory);
+                append (columns);
                 gpu = new GpuStats (suffix);
                 gpu.hexpand = true;
                 gpu.valign = Gtk.Align.START;
-                columns.append (grid);
-                columns.append (gpu);
-                append (columns);
+                append (gpu);
             } else {
+                var grid = new Gtk.Grid ();
+                grid.column_spacing = 16;
+                grid.row_spacing = 8;
+                grid.hexpand = true;
+                cpu_value = add_metric (grid, 0, "CPU");
+                memory_value = add_metric (grid, 1, "RAM");
                 append (grid);
             }
         }
