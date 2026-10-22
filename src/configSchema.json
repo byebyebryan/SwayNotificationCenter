@@ -426,12 +426,46 @@
         },
         "^calendar(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
           "$ref": "#/widgets/calendar"
+        },
+        "^system-stats(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/system-stats"
+        },
+        "^battery(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/battery"
         }
       }
     }
   },
   "widgets": {
     "$comment": "New widgets go here",
+    "system-stats": {
+      "type": "object",
+      "description": "Live CPU frequency/utilization and used/total memory while the panel is open",
+      "additionalProperties": false,
+      "properties": {
+        "interval": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 1,
+          "description": "Refresh interval in seconds while the panel is open"
+        }
+      }
+    },
+    "battery": {
+      "type": "object",
+      "description": "System batteries with charge/discharge power and approximate time to empty or the reported charge limit; hidden without a system battery",
+      "additionalProperties": false,
+      "properties": {
+        "interval": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 5,
+          "description": "Refresh interval in seconds while the panel is open"
+        }
+      }
+    },
     "notifications": {
       "type": "object",
       "description": "Control Center Title Widget",

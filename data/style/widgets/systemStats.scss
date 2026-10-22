@@ -1,0 +1,13 @@
+.widget-system-stats,
+.widget-battery {
+  border: var(--border);
+  padding: 12px 16px;
+
+  .metric-label {
+    color: var(--text-color-disabled);
+  }
+
+  .metric-value {
+    font-feature-settings: "tnum";
+  }
+}

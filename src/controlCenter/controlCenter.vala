@@ -174,6 +174,8 @@ namespace SwayNotificationCenter {
         public void add_widgets () {
             // Remove all widgets
             widgets.foreach ((widget) => {
+                // Cancel subscriptions/timers before replacing widgets, even while the panel is open.
+                widget.on_cc_visibility_change (false);
                 if (widget.get_parent () == box) {
                     box.remove (widget);
                 }
@@ -225,6 +227,7 @@ namespace SwayNotificationCenter {
 
                 unowned Widgets.BaseWidget cloned_widget = widgets.last ().data;
                 box.append (cloned_widget);
+                cloned_widget.on_cc_visibility_change (this.visible);
             }
         }
 

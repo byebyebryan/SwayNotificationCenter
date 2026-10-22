@@ -97,6 +97,7 @@ def run(binary, client_test):
                    "GTK_A11Y": "none", "XDG_CONFIG_HOME": str(root / "config"),
                    "XDG_CACHE_HOME": str(root / "cache"), "XDG_STATE_HOME": str(root / "state"),
                    "XDG_RUNTIME_DIR": str(runtime), "GIO_USE_VFS": "local", "GSETTINGS_BACKEND": "memory"}
+            env["G_MESSAGES_DEBUG"] = "swaync"
             env.pop("WAYLAND_DISPLAY", None)
             env.pop("NIRI_SOCKET", None)
             niri_config = root / "niri.kdl"
@@ -134,6 +135,60 @@ def run(binary, client_test):
                     raise AssertionError("SwayNC did not acquire private bus")
 
                 server = start()
+
+                # Native information widgets poll only while visible, including across reloads.
+                original_config = json.loads(config.read_text())
+                widget_config = dict(original_config, widgets=["system-stats", "battery", "notifications"],
+                                     **{"widget-config": {"system-stats": {"interval": 1},
+                                                          "battery": {"interval": 1}}})
+
+                def sample_counts():
+                    text = (root / "server.log").read_text()
+                    return (text.count("system-stats sample:"), text.count("battery snapshot:"))
+
+                def widgets_ready():
+                    deadline = time.monotonic() + 3
+                    while time.monotonic() < deadline:
+                        if min(sample_counts()) > 0:
+                            return
+                        pump(0.05)
+                    raise AssertionError((root / "server.log").read_text())
+
+                config.write_text(json.dumps(widget_config))
+                call("ReloadConfig", "()", ())
+                pump(1.2)
+                assert sample_counts() == (0, 0), "hidden widgets sampled"
+                call("SetVisibility", "(b)", (True,))
+                widgets_ready()
+                pump(2.2)
+                assert min(sample_counts()) >= 3, "visible widgets did not refresh"
+                before = sample_counts()
+                call("ReloadConfig", "()", ())
+                pump(2.2)
+                after = sample_counts()
+                assert all(3 <= last - first <= 4 for first, last in zip(before, after)), \
+                    ("reload failed to start replacements or leaked old timers", before, after)
+                call("SetVisibility", "(b)", (False,))
+                pump(0.1)
+                before = sample_counts()
+                pump(1.2)
+                assert sample_counts() == before, "closed widgets kept sampling"
+                call("SetVisibility", "(b)", (True,))
+                pump(0.2)
+                text = (root / "server.log").read_text()
+                first_cpu = [line for line in text.splitlines() if "system-stats sample:" in line][-1]
+                assert "· —; RAM" in first_cpu, "reopened widget reused the hidden CPU interval"
+                config.write_text(json.dumps(original_config))
+                call("ReloadConfig", "()", ())
+                pump(0.1)
+                before = sample_counts()
+                pump(1.2)
+                assert sample_counts() == before, "removed widgets kept sampling"
+                call("SetVisibility", "(b)", (False,))
+                print(json.dumps({"result": "passed", "proof": "live widget refresh lifecycle",
+                                  "checks": ["hidden idle", "visible refresh", "open reload",
+                                             "close cancellation", "fresh CPU baseline", "removal cleanup"]}))
+
                 a = notify("older")
                 a_revision = snapshot(a)["revision"]
                 pump(0.3)

@@ -1,0 +1,52 @@
+namespace SwayNotificationCenter.Widgets {
+    public class SystemStats : PollingWidget {
+        public override string widget_name { get {
+                                                 return "system-stats";
+                                             } }
+
+        SystemData.Reader reader = new SystemData.Reader ();
+        SystemData.CpuTimes ?previous = null;
+        Gtk.Label cpu_value;
+        Gtk.Label memory_value;
+
+        public SystemStats (string suffix) {
+            base (suffix);
+            configure_interval (1);
+            var grid = new Gtk.Grid ();
+            grid.column_spacing = 16;
+            grid.row_spacing = 8;
+            grid.hexpand = true;
+            cpu_value = add_metric (grid, 0, "CPU");
+            memory_value = add_metric (grid, 1, "RAM");
+            append (grid);
+        }
+
+        protected override void reset_sample () {
+            previous = null;
+            cpu_value.label = "—";
+        }
+
+        protected override async void update_sample (Cancellable cancellable) {
+            var sample = yield reader.system (cancellable);
+
+            if (cancellable.is_cancelled ()) {
+                return;
+            }
+            double usage = sample.cpu != null ?sample.cpu.usage_since (previous) : -1;
+
+            previous = sample.cpu;
+            string frequency = sample.frequency_ghz > 0
+                ? "%.1f GHz".printf (sample.frequency_ghz) : "—";
+            string utilization = usage >= 0 ? "%.0f%%".printf (usage) : "—";
+            cpu_value.label = "%s · %s".printf (frequency, utilization);
+            if (sample.memory_total_gib > 0) {
+                memory_value.label = "%.1f / %.1f GiB · %.0f%%".printf (
+                    sample.memory_used_gib, sample.memory_total_gib,
+                    100 * sample.memory_used_gib / sample.memory_total_gib);
+            } else {
+                memory_value.label = "—";
+            }
+            debug ("system-stats sample: CPU %s; RAM %s", cpu_value.label, memory_value.label);
+        }
+    }
+}

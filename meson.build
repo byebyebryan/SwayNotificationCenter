@@ -30,6 +30,12 @@ subdir('protocols')
 subdir('data')
 subdir('src')
 
+system_data_test = executable('system-data-test',
+  ['tests/system-data.vala', 'src/controlCenter/widgets/shared/systemData.vala'],
+  dependencies: [dependency('gio-2.0'), cc.find_library('m')],
+)
+test('system-data', system_data_test)
+
 meson.add_devenv(dev_env)
 
 conf_data = configuration_data()

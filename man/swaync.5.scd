@@ -335,6 +335,10 @@ config file to be able to detect config errors
 			optional: true ++
 		*slider*++
 			optional: true ++
+		*system-stats*++
+			optional: true ++
+		*battery*++
+			optional: true ++
 #START pulse-audio
 		*volume*++
 			optional: true ++
@@ -654,6 +658,30 @@ config file to be able to detect config errors
 					default: 0 ++
 					description: scale small value, slider round digits ++
 			description: general slider control ++
+		*system-stats*++
+			type: object ++
+			css class: widget-system-stats ++
+			properties: ++
+				interval: ++
+					type: integer ++
+					optional: true ++
+					default: 1 ++
+					description: Refresh interval in seconds (1-3600), only while the panel is open. ++
+			description: CPU average reported frequency and utilization, plus used/total RAM and percentage. ++
+				RAM uses MemTotal minus MemAvailable. CPU usage appears after the first complete sample interval. ++
+		*battery*++
+			type: object ++
+			css class: widget-battery ++
+			properties: ++
+				interval: ++
+					type: integer ++
+					optional: true ++
+					default: 5 ++
+					description: Refresh interval in seconds (1-3600), only while the panel is open. ++
+			description: System battery state, percentage, battery charge/discharge wattage, and approximate ETA. ++
+				Charging ETA requires a reported charge_control_end_threshold and targets that percentage. ++
+				Discharging ETA targets empty. Paused/full batteries and unusable rates show no ETA. ++
+				Device batteries are excluded; without a system battery the widget is hidden. ++
 #START pulse-audio
 		*volume*++
 			type: object ++
