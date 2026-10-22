@@ -5,6 +5,7 @@ namespace SwayNotificationCenter {
     [DBus (name = "org.freedesktop.Notifications")]
     public class NotiDaemon : Object {
         private uint32 noti_id = 0;
+        private DBusConnection connection;
         private HashTable<string, uint32> synchronous_ids =
             new HashTable<string, uint32> (str_hash, str_equal);
         private Gee.HashSet<uint32> notification_ids = new Gee.HashSet<uint32> ();
@@ -14,7 +15,8 @@ namespace SwayNotificationCenter {
         /** Called when Do Not Disturb state changes */
         internal signal void on_dnd_toggle (bool dnd);
 
-        public NotiDaemon () {
+        public NotiDaemon (DBusConnection connection) {
+            this.connection = connection;
             this.notify["dnd"].connect (() => on_dnd_toggle (dnd));
 
             // Init dnd from gsettings
@@ -127,6 +129,86 @@ namespace SwayNotificationCenter {
             floating_notifications.latest_notification_default_action ();
         }
 
+        internal Notification ?find_action_notification (uint32 id) {
+            if (!notification_ids.contains (id)) {
+                return null;
+            }
+            Notification ?notification = notifications_widget.find_notification (id);
+            if (notification == null) {
+                notification = floating_notifications.find_notification (id);
+            }
+            if (notification == null || notification.dismissed
+                || notification.param.applied_id != id) {
+                return null;
+            }
+            return notification;
+        }
+
+        // These methods run on the GTK main loop without yielding. Revision
+        // validation and dispatch therefore refer to the same Notify object.
+        internal HashTable<string, Variant> get_notification (uint32 id) {
+            var result = new HashTable<string, Variant> (str_hash, str_equal);
+            Notification ?notification = find_action_notification (id);
+            if (notification == null) {
+                return result;
+            }
+            unowned NotifyParams param = notification.param;
+            string[] actions = {};
+            if (param.default_action != null) {
+                actions += param.default_action.identifier;
+                actions += param.default_action.text;
+            }
+            foreach (unowned Action action in param.actions.data) {
+                actions += action.identifier;
+                actions += action.text;
+            }
+            result.insert ("id", new Variant.uint32 (id));
+            result.insert ("revision", new Variant.string (param.action_revision));
+            result.insert ("app", new Variant.string (param.app_name));
+            result.insert ("summary", new Variant.string (param.summary));
+            result.insert ("body", new Variant.string (param.body));
+            result.insert ("actions", new Variant.strv (actions));
+            return result;
+        }
+
+        internal string invoke_action (uint32 id, string revision, string action_key,
+                                       string ?activation_token = null) {
+            Notification ?notification = find_action_notification (id);
+            if (notification == null) {
+                return "unavailable";
+            }
+            if (revision.length == 0 || notification.param.action_revision != revision) {
+                return "stale";
+            }
+            if (activation_token != null && activation_token.length > 4096) {
+                return "unavailable";
+            }
+            return notification.invoke_action (action_key, activation_token) ? "dispatched" : "unavailable";
+        }
+
+        internal bool send_action (NotifyParams param, string action_key, string ?token) {
+            // Never broadcast an action or focus token: applications can retain
+            // stale numeric IDs across a notification-daemon restart. A unique
+            // connection name cannot be reassigned to another client on this bus.
+            if (param.sender == null || !param.sender.has_prefix (":")) {
+                return false;
+            }
+            try {
+                if (token != null) {
+                    connection.emit_signal (param.sender, "/org/freedesktop/Notifications",
+                                            "org.freedesktop.Notifications", "ActivationToken",
+                                            new Variant ("(us)", param.applied_id, token));
+                }
+                connection.emit_signal (param.sender, "/org/freedesktop/Notifications",
+                                        "org.freedesktop.Notifications", "ActionInvoked",
+                                        new Variant ("(us)", param.applied_id, action_key));
+                return true;
+            } catch (Error e) {
+                warning ("Could not send notification action: %s", e.message);
+                return false;
+            }
+        }
+
         /*
          * D-Bus Specification
          * https://specifications.freedesktop.org/notification-spec/latest/ar01s09.html
@@ -177,7 +259,8 @@ namespace SwayNotificationCenter {
                                         string body,
                                         string[] actions,
                                         HashTable<string, Variant> hints,
-                                        int expire_timeout) throws DBusError, IOError {
+                                        int expire_timeout,
+                                        GLib.BusName ?sender = null) throws DBusError, IOError {
             uint32 id = replaces_id;
             if (replaces_id == 0 || replaces_id > noti_id) {
                 id = ++noti_id;
@@ -193,7 +276,8 @@ namespace SwayNotificationCenter {
                 body,
                 actions,
                 hints,
-                expire_timeout);
+                expire_timeout,
+                sender);
 
             debug ("Notification (ID:%u, state: %s): %s\n",
                    param.applied_id, param.status_state.to_string (), param.to_string ());

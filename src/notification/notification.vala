@@ -431,6 +431,24 @@ namespace SwayNotificationCenter {
             action_clicked (param.default_action);
         }
 
+        // Use the same dispatch, activation-token and resident handling as a
+        // UI click, but never fall back to a different or missing action.
+        internal bool invoke_action (string identifier, string ?activation_token = null) {
+            if (dismissed || identifier.length == 0) {
+                return false;
+            }
+            if (param.default_action != null
+                && param.default_action.identifier == identifier) {
+                return action_clicked (param.default_action, activation_token);
+            }
+            foreach (unowned Action action in param.actions.data) {
+                if (action.identifier == identifier) {
+                    return action_clicked (action, activation_token);
+                }
+            }
+            return false;
+        }
+
         public void click_alt_action (uint index) {
             if (!alt_actions_box.visible) {
                 return;
@@ -462,19 +480,19 @@ namespace SwayNotificationCenter {
             action_clicked (param.actions.index (index));
         }
 
-        private void action_clicked (Action ?action) {
+        private bool action_clicked (Action ?action, string ?activation_token = null) {
+            bool dispatched = false;
             noti_daemon.run_scripts (param, ScriptRunOnType.ACTION);
             if (action != null
                 && action.identifier != null
                 && action.identifier != "") {
                 // Try getting a XDG Activation token so that the application
                 // can request compositor focus
-                string ?token = app.xdg_activation.get_token (this);
-                if (token != null) {
-                    noti_daemon.ActivationToken (param.applied_id, token);
+                string ?token = activation_token;
+                if (token == null || token.length == 0) {
+                    token = app.xdg_activation.get_token (this);
                 }
-
-                noti_daemon.ActionInvoked (param.applied_id, action.identifier);
+                dispatched = noti_daemon.send_action (param, action.identifier, token);
                 if (ConfigModel.instance.hide_on_action) {
                     try {
                         swaync_daemon.set_visibility (false);
@@ -486,6 +504,7 @@ namespace SwayNotificationCenter {
             if (!param.resident) {
                 request_dismiss_notification (ClosedReasons.DISMISSED, false);
             }
+            return dispatched;
         }
 
         private void set_style_urgency () {

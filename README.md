@@ -7,6 +7,9 @@
 
 A simple notification daemon with a GTK gui for notifications and the control center
 
+This fork also supports [revision-checked actions for specific retained
+notifications](docs/notification-actions.md), alongside its Niri activation fix.
+
 *Note: SwayNotificationCenter only supports Desktops / Window Managers that
 support `wlr_layer_shell_unstable_v1` like Sway or anything wlroots based*
 

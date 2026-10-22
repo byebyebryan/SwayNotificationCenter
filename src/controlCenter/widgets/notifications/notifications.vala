@@ -231,6 +231,19 @@ namespace SwayNotificationCenter.Widgets {
             add_notification (new_params);
         }
 
+        internal Notification ?find_notification (uint32 id) {
+            unowned NotificationGroup ?group = noti_groups_id.get (id);
+            if (group == null || group.dismissed) {
+                return null;
+            }
+            unowned Notification ?notification = group.notification_ids.get (id);
+            if (notification == null || notification.dismissed
+                || notification.param.applied_id != id) {
+                return null;
+            }
+            return notification;
+        }
+
         public void add_notification (NotifyParams param) {
             var noti = new Notification.regular (param, NotificationType.CONTROL_CENTER);
             noti.set_time ();
