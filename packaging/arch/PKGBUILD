@@ -1,0 +1,24 @@
+# Bryan's pinned SwayNC fork, built from its published source commit.
+pkgname=swaync-bryan
+pkgver=0.12.6
+pkgrel=1
+_commit=7f1b612eb50308ea91a2e2dd54ae293496b08800
+pkgdesc="Bryan's SwayNC fork with input-serial activation tokens"
+arch=('x86_64')
+url='https://github.com/byebyebryan/SwayNotificationCenter'
+license=('GPL-3.0-only')
+depends=('gtk4' 'gtk4-layer-shell' 'libadwaita' 'glib2' 'libgee' 'json-glib' 'libpulse' 'granite7')
+makedepends=('vala' 'meson' 'scdoc' 'sassc' 'gobject-introspection' 'blueprint-compiler')
+optdepends=('gvfs: Get album art in MPRIS widget')
+provides=("swaync=${pkgver}")
+conflicts=('swaync')
+source=("SwayNotificationCenter-${_commit}.tar.gz::${url}/archive/${_commit}.tar.gz")
+sha256sums=('54c466dc0b3c5e0dc266d5d83be276c1cfd4499a11190fd8caaefa2d908f2bec')
+build() {
+    arch-meson "SwayNotificationCenter-${_commit}" build -Dscripting=true
+    meson compile -C build
+}
+package() {
+    DESTDIR="$pkgdir" meson install -C build
+    install -Dm644 "SwayNotificationCenter-${_commit}/README.md" "$pkgdir/usr/share/doc/swaync/README.md"
+}
