@@ -40,6 +40,15 @@ namespace SwayNotificationCenter.Widgets {
             case "calendar":
                 widget = new Calendar (suffix);
                 break;
+            case "system-stats":
+                widget = new SystemStats (suffix);
+                break;
+            case "dashboard":
+                widget = new Dashboard (suffix);
+                break;
+            case "battery":
+                widget = new Battery (suffix);
+                break;
 #if HAVE_PULSE_AUDIO
             case "volume":
                 widget = new Volume (suffix);

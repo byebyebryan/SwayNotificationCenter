@@ -28,6 +28,14 @@ widget_sources = [
   'controlCenter/widgets/baseWidget.vala',
   'controlCenter/widgets/factory.vala',
   'controlCenter/widgets/shared/toggleButton.vala',
+  'controlCenter/widgets/shared/pollingWidget.vala',
+  'controlCenter/widgets/shared/systemData.vala',
+  'controlCenter/widgets/shared/gpuData.vala',
+  'controlCenter/widgets/shared/wirelessData.vala',
+  'controlCenter/widgets/shared/busWidget.vala',
+  'controlCenter/widgets/dashboard/dashboard.vala',
+  'controlCenter/widgets/systemStats/systemStats.vala',
+  'controlCenter/widgets/battery/battery.vala',
   # Widget: Notifications
   'controlCenter/widgets/notifications/notifications.vala',
   # Widget: Title
@@ -78,7 +86,6 @@ app_sources = [
   'blankWindow/blankWindow.vala',
   'functions.vala',
   'xdg_activation.vala',
-  constants,
 ]
 
 assert(vala.version() >= '0.56')
@@ -124,6 +131,8 @@ endif
 args = [
   '--target-glib=2.82',
 ]
+
+app_sources = files(app_sources) + [constants]
 
 executable('swaync',
   [ app_sources, app_resources ],

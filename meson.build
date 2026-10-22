@@ -30,6 +30,30 @@ subdir('protocols')
 subdir('data')
 subdir('src')
 
+# Uses the real panel/widgets on a private display and bus; not installed or
+# built by normal package builds. See docs/system-widgets.md for invocation.
+executable('widget-interaction-test',
+  [app_sources, app_resources, 'tests/widget-interactions.vala'],
+  vala_args: args + ['--main=SwayNotificationCenter.WidgetTests.main'],
+  dependencies: app_deps,
+  build_by_default: false,
+)
+
+system_data_test = executable('system-data-test',
+  ['tests/system-data.vala', 'src/controlCenter/widgets/shared/systemData.vala'],
+  dependencies: [dependency('gio-2.0'), cc.find_library('m')],
+)
+test('system-data', system_data_test)
+
+dashboard_data_test = executable('dashboard-data-test',
+  ['tests/dashboard-data.vala',
+   'src/controlCenter/widgets/shared/systemData.vala',
+   'src/controlCenter/widgets/shared/gpuData.vala',
+   'src/controlCenter/widgets/shared/wirelessData.vala'],
+  dependencies: [dependency('gio-2.0'), cc.find_library('m')],
+)
+test('dashboard-data', dashboard_data_test)
+
 meson.add_devenv(dev_env)
 
 conf_data = configuration_data()
