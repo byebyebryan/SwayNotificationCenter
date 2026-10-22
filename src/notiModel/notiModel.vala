@@ -71,6 +71,9 @@ namespace SwayNotificationCenter {
 
     public class NotifyParams : Object {
         public uint32 applied_id { get; private set; }
+        // A new Notify call always creates a new revision, including an
+        // identical replacement. Never derive action identity from its text.
+        public string action_revision { get; private set; }
         public string app_name { get; private set; }
         public uint32 replaces_id { get; private set; }
         public string app_icon { get; private set; }
@@ -178,6 +181,7 @@ namespace SwayNotificationCenter {
                              HashTable<string, Variant> hints,
                              int expire_timeout) {
             this.applied_id = applied_id;
+            this.action_revision = Uuid.string_random ();
             this.app_name = app_name;
             this.replaces_id = replaces_id;
             this.app_icon = Uri.unescape_string (app_icon);

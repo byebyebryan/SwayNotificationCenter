@@ -127,6 +127,63 @@ namespace SwayNotificationCenter {
             floating_notifications.latest_notification_default_action ();
         }
 
+        internal Notification ?find_action_notification (uint32 id) {
+            if (!notification_ids.contains (id)) {
+                return null;
+            }
+            Notification ?notification = notifications_widget.find_notification (id);
+            if (notification == null) {
+                notification = floating_notifications.find_notification (id);
+            }
+            if (notification == null || notification.dismissed
+                || notification.param.applied_id != id) {
+                return null;
+            }
+            return notification;
+        }
+
+        // These methods run on the GTK main loop without yielding. Revision
+        // validation and dispatch therefore refer to the same Notify object.
+        internal HashTable<string, Variant> get_notification (uint32 id) {
+            var result = new HashTable<string, Variant> (str_hash, str_equal);
+            Notification ?notification = find_action_notification (id);
+            if (notification == null) {
+                return result;
+            }
+            unowned NotifyParams param = notification.param;
+            string[] actions = {};
+            if (param.default_action != null) {
+                actions += param.default_action.identifier;
+                actions += param.default_action.text;
+            }
+            foreach (unowned Action action in param.actions.data) {
+                actions += action.identifier;
+                actions += action.text;
+            }
+            result.insert ("id", new Variant.uint32 (id));
+            result.insert ("revision", new Variant.string (param.action_revision));
+            result.insert ("app", new Variant.string (param.app_name));
+            result.insert ("summary", new Variant.string (param.summary));
+            result.insert ("body", new Variant.string (param.body));
+            result.insert ("actions", new Variant.strv (actions));
+            return result;
+        }
+
+        internal string invoke_action (uint32 id, string revision, string action_key,
+                                       string ?activation_token = null) {
+            Notification ?notification = find_action_notification (id);
+            if (notification == null) {
+                return "unavailable";
+            }
+            if (revision.length == 0 || notification.param.action_revision != revision) {
+                return "stale";
+            }
+            if (activation_token != null && activation_token.length > 4096) {
+                return "unavailable";
+            }
+            return notification.invoke_action (action_key, activation_token) ? "dispatched" : "unavailable";
+        }
+
         /*
          * D-Bus Specification
          * https://specifications.freedesktop.org/notification-spec/latest/ar01s09.html

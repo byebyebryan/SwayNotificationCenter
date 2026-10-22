@@ -431,6 +431,26 @@ namespace SwayNotificationCenter {
             action_clicked (param.default_action);
         }
 
+        // Use the same dispatch, activation-token and resident handling as a
+        // UI click, but never fall back to a different or missing action.
+        internal bool invoke_action (string identifier, string ?activation_token = null) {
+            if (dismissed || identifier.length == 0) {
+                return false;
+            }
+            if (param.default_action != null
+                && param.default_action.identifier == identifier) {
+                action_clicked (param.default_action, activation_token);
+                return true;
+            }
+            foreach (unowned Action action in param.actions.data) {
+                if (action.identifier == identifier) {
+                    action_clicked (action, activation_token);
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public void click_alt_action (uint index) {
             if (!alt_actions_box.visible) {
                 return;
@@ -462,14 +482,17 @@ namespace SwayNotificationCenter {
             action_clicked (param.actions.index (index));
         }
 
-        private void action_clicked (Action ?action) {
+        private void action_clicked (Action ?action, string ?activation_token = null) {
             noti_daemon.run_scripts (param, ScriptRunOnType.ACTION);
             if (action != null
                 && action.identifier != null
                 && action.identifier != "") {
                 // Try getting a XDG Activation token so that the application
                 // can request compositor focus
-                string ?token = app.xdg_activation.get_token (this);
+                string ?token = activation_token;
+                if (token == null || token.length == 0) {
+                    token = app.xdg_activation.get_token (this);
+                }
                 if (token != null) {
                     noti_daemon.ActivationToken (param.applied_id, token);
                 }
