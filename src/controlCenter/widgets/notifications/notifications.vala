@@ -360,10 +360,10 @@ namespace SwayNotificationCenter.Widgets {
                         if (keyval == num_keyval && group != null) {
                             var noti = group.get_latest_notification ();
                             noti.click_alt_action (i);
-                            break;
+                            return true;
                         }
                     }
-                    break;
+                    return false;
             }
             // Override the builtin list navigation
             return true;

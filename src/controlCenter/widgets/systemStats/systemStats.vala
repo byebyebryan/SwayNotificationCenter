@@ -49,6 +49,8 @@ namespace SwayNotificationCenter.Widgets {
         protected override void reset_sample () {
             previous = null;
             cpu_value.label = "—";
+            memory_value.label = "—";
+            memory_value.tooltip_text = null;
         }
 
         protected override async void update_sample (Cancellable cancellable) {
@@ -77,6 +79,7 @@ namespace SwayNotificationCenter.Widgets {
                 }
             } else {
                 memory_value.label = "—";
+                memory_value.tooltip_text = null;
             }
             debug ("system-stats sample: CPU %s; RAM %s", cpu_value.label, memory_value.label);
         }

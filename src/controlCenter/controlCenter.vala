@@ -152,10 +152,15 @@ namespace SwayNotificationCenter {
         }
 
         private bool key_press_event_cb (uint keyval, uint keycode, Gdk.ModifierType state) {
-            if (get_focus () is Gtk.Editable) {
+            unowned Gtk.Widget ?focus = get_focus ();
+            if (focus is Gtk.Editable) {
                 return false;
             }
             switch (Gdk.keyval_name (keyval)) {
+                case "Tab" :
+                case "ISO_Left_Tab":
+                    // Let GTK traverse the whole panel, including widget controls.
+                    return false;
                 case "D":
                     try {
                         swaync_daemon.toggle_dnd ();
@@ -164,6 +169,13 @@ namespace SwayNotificationCenter {
                     }
                     break;
                 default:
+                    // Buttons, switches and sliders outside notification history own
+                    // their activation/navigation keys. Keep history shortcuts scoped
+                    // to history (or the initial, unfocused panel).
+                    if (focus != null && focus != notifications_widget &&
+                        !focus.is_ancestor (notifications_widget)) {
+                        return false;
+                    }
                     return notifications_widget.key_press_event_cb (keyval, keycode, state);
             }
             // Override the builtin list navigation

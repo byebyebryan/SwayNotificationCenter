@@ -86,7 +86,6 @@ app_sources = [
   'blankWindow/blankWindow.vala',
   'functions.vala',
   'xdg_activation.vala',
-  constants,
 ]
 
 assert(vala.version() >= '0.56')
@@ -132,6 +131,8 @@ endif
 args = [
   '--target-glib=2.82',
 ]
+
+app_sources = files(app_sources) + [constants]
 
 executable('swaync',
   [ app_sources, app_resources ],

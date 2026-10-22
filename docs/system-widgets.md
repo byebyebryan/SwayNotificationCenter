@@ -30,6 +30,11 @@ Expanded devices fill further two-column rows. Percentages reserve two digits
 with a figure space for single digits; tabular numerals keep their rendered
 width stable from 0 through 99 without leading zeroes. 100% remains supported.
 
+Tab and Shift+Tab traverse the whole panel. Focused dashboard buttons and volume
+controls receive their native activation/navigation keys; notification-history
+shortcuts apply while focus is in history. The existing D and Escape shortcuts
+remain available outside editable fields.
+
 System shows average reported CPU frequency, utilization between samples,
 and used RAM in GiB with a percentage (total in its tooltip). RAM uses
 `MemTotal - MemAvailable`.
@@ -84,7 +89,11 @@ All reads are asynchronous. CPU/RAM, GPU and battery poll independently with at
 most one sample in flight per reader, only while the control center is open.
 Closing or replacing the dashboard cancels its reads, subprocess, timers and
 network/Bluetooth subscriptions. Reloading configuration while open starts replacements
-immediately. No extra background daemon is needed. Debug logging includes samples
+immediately. Opening clears CPU/RAM placeholders and hides battery and wireless
+cards until their first fresh read completes; cached values from a previous
+opening are not displayed. Cancelled system reads are treated as unavailable
+without passing null values to numeric parsers. No extra background daemon is
+needed. Debug logging includes samples
 and subscription lifecycle when `G_MESSAGES_DEBUG=swaync` is set.
 
 The original standalone `system-stats` and `battery` widgets remain supported;
@@ -102,3 +111,11 @@ Add `--dashboard-screenshot /tmp/dashboard.png` to capture the private fixture
 with a long SSID and multiple Bluetooth devices, plus an Ethernet variant in
 `/tmp/dashboard-ethernet.png`. When the binary is in a Meson
 build tree, the test uses that tree's compiled stylesheet.
+
+For focused GTK keyboard/fresh-opening regressions, run
+`meson compile -C build widget-interaction-test`, then
+`python tests/widget-interactions.py --binary build/widget-interaction-test`.
+This optional target compiles the real panel/widget sources with a test entry
+point; it is not installed or built by normal package builds. The runner owns a
+private D-Bus session and Xvfb display, uses memory-backed settings, and cannot
+connect to the desktop system bus or audio server. It requires Xvfb and xauth.

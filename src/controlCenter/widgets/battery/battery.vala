@@ -87,6 +87,10 @@ namespace SwayNotificationCenter.Widgets {
             visible = false;
         }
 
+        protected override void reset_sample () {
+            visible = false;
+        }
+
         protected override async void update_sample (Cancellable cancellable) {
             var samples = yield reader.batteries (cancellable);
 

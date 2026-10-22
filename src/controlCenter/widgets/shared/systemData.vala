@@ -12,8 +12,8 @@ namespace SwayNotificationCenter.Widgets.SystemData {
         public uint64 total;
         public uint64 idle;
 
-        public static CpuTimes ?parse (string contents) {
-            if (contents.strip () == "") {
+        public static CpuTimes ?parse (string ?contents) {
+            if (contents == null || contents.strip () == "") {
                 return null;
             }
             string[] fields = Regex.split_simple ("\\s+", contents.strip ().split ("\n", 2)[0]);
@@ -55,7 +55,10 @@ namespace SwayNotificationCenter.Widgets.SystemData {
         public double memory_used_gib = -1;
         public double memory_total_gib = -1;
 
-        public void parse_memory (string contents) {
+        public void parse_memory (string ?contents) {
+            if (contents == null) {
+                return;
+            }
             double total = -1;
             double available = -1;
             foreach (string line in contents.split ("\n")) {
@@ -146,16 +149,19 @@ namespace SwayNotificationCenter.Widgets.SystemData {
         }
     }
 
-    public double number (string contents) {
+    public double number (string ?contents) {
         double value;
         // Vala's double.try_parse accepts an empty string as zero.
-        if (contents.strip () == "") {
+        if (contents == null || contents.strip () == "") {
             return -1;
         }
         return double.try_parse (contents, out value) && value.is_finite () ? value : -1;
     }
 
-    public double frequency (string contents) {
+    public double frequency (string ?contents) {
+        if (contents == null) {
+            return -1;
+        }
         double total = 0;
         int count = 0;
         foreach (string line in contents.split ("\n")) {
@@ -184,7 +190,9 @@ namespace SwayNotificationCenter.Widgets.SystemData {
             this.supply_root = supply_root;
         }
 
-        async string read (string path, Cancellable cancellable) {
+        // A cancelled Vala async task can return null even when the body
+        // supplies an empty fallback. Parsers treat either as unavailable.
+        async string ?read (string path, Cancellable cancellable) {
             if (cancellable.is_cancelled ()) {
                 return "";
             }
@@ -300,12 +308,16 @@ namespace SwayNotificationCenter.Widgets.SystemData {
 
                 double value = 0;
                 // Signed driver readings describe direction; status supplies the label.
-                if (current != "" && double.try_parse (current, out value) && value.is_finite ()) {
+                if (current != null && current != "" && double.try_parse (current,
+                                                                          out value) &&
+                    value.is_finite ()) {
                     sample.current = value.abs ();
                 }
                 string power = yield read (Path.build_filename (path, "power_now"), cancellable);
 
-                if (power != "" && double.try_parse (power, out value) && value.is_finite ()) {
+                if (power != null && power != "" && double.try_parse (power,
+                                                                      out value) &&
+                    value.is_finite ()) {
                     sample.power = value.abs ();
                 } else {
                     double voltage = number (yield read (Path.build_filename (path, "voltage_now"),

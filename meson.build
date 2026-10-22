@@ -30,6 +30,15 @@ subdir('protocols')
 subdir('data')
 subdir('src')
 
+# Uses the real panel/widgets on a private display and bus; not installed or
+# built by normal package builds. See docs/system-widgets.md for invocation.
+executable('widget-interaction-test',
+  [app_sources, app_resources, 'tests/widget-interactions.vala'],
+  vala_args: args + ['--main=SwayNotificationCenter.WidgetTests.main'],
+  dependencies: app_deps,
+  build_by_default: false,
+)
+
 system_data_test = executable('system-data-test',
   ['tests/system-data.vala', 'src/controlCenter/widgets/shared/systemData.vala'],
   dependencies: [dependency('gio-2.0'), cc.find_library('m')],

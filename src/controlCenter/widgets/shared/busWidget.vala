@@ -129,6 +129,8 @@ namespace SwayNotificationCenter.Widgets {
         public override void on_cc_visibility_change (bool visible) {
             stop ();
             if (visible) {
+                // A previous connection/device list is not a fresh opening sample.
+                apply_snapshot (null);
                 var token = new Cancellable ();
                 lifetime = token;
                 start.begin (token);

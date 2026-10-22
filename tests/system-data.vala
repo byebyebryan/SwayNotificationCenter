@@ -9,6 +9,7 @@ void test_cpu () {
     assert (second.usage_since (second) == -1);
     assert (first.usage_since (second) == -1);
     assert (CpuTimes.parse ("") == null);
+    assert (CpuTimes.parse (null) == null);
     assert (CpuTimes.parse ("cpu 1 nope 2 3") == null);
     assert (CpuTimes.parse ("cpu -1 0 0 1") == null);
     var decreasing_idle = CpuTimes.parse ("cpu 1000 0 0 700");
@@ -22,10 +23,13 @@ void test_memory_frequency () {
     var invalid = new SystemSample ();
     invalid.parse_memory ("MemTotal: 10 kB\nMemAvailable: 20 kB\n");
     assert (invalid.memory_total_gib == -1);
+    invalid.parse_memory (null);
+    assert (invalid.memory_total_gib == -1);
     assert (frequency ("processor: 0\ncpu MHz : 1000\ncpu MHz : 3000\n") == 2);
     assert (frequency ("cpu MHz: nope\n") == -1);
     assert (number ("nan") == -1 && number ("inf") == -1 && number ("invalid") == -1);
     assert (number ("") == -1 && number (" ") == -1);
+    assert (number (null) == -1 && frequency (null) == -1);
 }
 
 void test_percentages () {
