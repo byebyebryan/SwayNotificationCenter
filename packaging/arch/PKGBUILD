@@ -1,19 +1,20 @@
 # Bryan's pinned SwayNC fork, built from its published source commit.
 pkgname=swaync-bryan
 pkgver=0.12.6
-pkgrel=4
-_commit=c68d59137d3229ef0654705227622757f3c4e0cd
-pkgdesc="Bryan's SwayNC fork with checked notification actions and live system widgets"
+pkgrel=5
+_commit=8a5e32d43f99944173f59b400c0c7d738dc0db51
+pkgdesc="Bryan's SwayNC fork with checked notification actions and a live system dashboard"
 arch=('x86_64')
 url='https://github.com/byebyebryan/SwayNotificationCenter'
 license=('GPL-3.0-only')
 depends=('gtk4' 'gtk4-layer-shell' 'libadwaita' 'glib2' 'libgee' 'json-glib' 'libpulse' 'granite7')
 makedepends=('vala' 'meson' 'scdoc' 'sassc' 'gobject-introspection' 'blueprint-compiler')
-optdepends=('gvfs: Get album art in MPRIS widget')
+optdepends=('gvfs: Get album art in MPRIS widget'
+            'nvidia-utils: NVIDIA dashboard metrics for already active GPUs')
 provides=("swaync=${pkgver}")
 conflicts=('swaync')
 source=("SwayNotificationCenter-${_commit}.tar.gz::${url}/archive/${_commit}.tar.gz")
-sha256sums=('a9049117af599a4f738685357a0cb47d1e3766827aedf4836d8df5852f51ed38')
+sha256sums=('555316452aad148043a2d2550a33ef89b000b4e00a2472dcd99df0546258973e')
 build() {
     arch-meson "SwayNotificationCenter-${_commit}" build -Dscripting=true
     meson compile -C build
