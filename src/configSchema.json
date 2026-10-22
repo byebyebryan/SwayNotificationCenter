@@ -432,12 +432,37 @@
         },
         "^battery(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
           "$ref": "#/widgets/battery"
+        },
+        "^gpu(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/gpu"
+        },
+        "^dashboard(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/dashboard"
         }
       }
     }
   },
   "widgets": {
     "$comment": "New widgets go here",
+    "dashboard": {
+      "type": "object",
+      "description": "Two-column system, battery, Wi-Fi and Bluetooth cards; absent hardware is hidden and the last unpaired card spans both columns",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "gpu": {
+      "type": "object",
+      "description": "NVIDIA GPU/VRAM rows inside dashboard system stats; query only GPUs whose cached PCI runtime state is active",
+      "additionalProperties": false,
+      "properties": {
+        "interval": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 2
+        }
+      }
+    },
     "system-stats": {
       "type": "object",
       "description": "Live CPU frequency/utilization and used/total memory while the panel is open",

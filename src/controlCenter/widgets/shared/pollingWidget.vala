@@ -35,6 +35,7 @@ namespace SwayNotificationCenter.Widgets {
             value.xalign = 1;
             value.hexpand = true;
             value.ellipsize = Pango.EllipsizeMode.END;
+            value.max_width_chars = 1;
             value.add_css_class ("metric-value");
             grid.attach (label, 0, row);
             grid.attach (value, 1, row);

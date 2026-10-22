@@ -16,7 +16,7 @@ import tempfile
 import time
 
 
-def run(binary, client_test):
+def run(binary, client_test, dashboard_screenshot=None):
     import gi
     gi.require_version("Gio", "2.0")
     from gi.repository import Gio, GLib
@@ -97,6 +97,15 @@ def run(binary, client_test):
                    "GTK_A11Y": "none", "XDG_CONFIG_HOME": str(root / "config"),
                    "XDG_CACHE_HOME": str(root / "cache"), "XDG_STATE_HOME": str(root / "state"),
                    "XDG_RUNTIME_DIR": str(runtime), "GIO_USE_VFS": "local", "GSETTINGS_BACKEND": "memory"}
+            # Private ObjectManagers stand in for the system bus. GPU fixture tests
+            # exercise the real query guard; this GUI test never invokes NVIDIA.
+            env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ["DBUS_SESSION_BUS_ADDRESS"]
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            fake_smi = fake_bin / "nvidia-smi"
+            fake_smi.write_text("#!/bin/sh\nprintf '%s\\n' '1200, 15, 1024, 8192'\n")
+            fake_smi.chmod(0o700)
+            env["PATH"] = str(fake_bin) + os.pathsep + env["PATH"]
             env["G_MESSAGES_DEBUG"] = "swaync"
             env.pop("WAYLAND_DISPLAY", None)
             env.pop("NIRI_SOCKET", None)
@@ -119,7 +128,11 @@ def run(binary, client_test):
             env["NIRI_SOCKET"] = str(ipc_sockets[0])
             with (root / "server.log").open("w+") as log:
                 def start():
-                    process = subprocess.Popen([binary, "-c", str(config), "-s", str(style)], env=env,
+                    packaged_style = Path(binary).resolve().parents[1] / "data/style/style.css"
+                    command = [binary, "-c", str(config), "-s", str(style)]
+                    if packaged_style.is_file():
+                        command += ["--custom-system-css", str(packaged_style)]
+                    process = subprocess.Popen(command, env=env,
                                                stdout=log, stderr=subprocess.STDOUT)
                     deadline = time.monotonic() + 8
                     while time.monotonic() < deadline:
@@ -189,6 +202,128 @@ def run(binary, client_test):
                                   "checks": ["hidden idle", "visible refresh", "open reload",
                                              "close cancellation", "fresh CPU baseline", "removal cleanup"]}))
 
+                # Exercise the nested dashboard with event-driven, private wireless services.
+                fake = {
+                    "nm": {
+                        "/org/freedesktop/NetworkManager": {"org.freedesktop.NetworkManager": {
+                            "WirelessEnabled": GLib.Variant("b", True)}},
+                        "/device": {
+                            "org.freedesktop.NetworkManager.Device": {"State": GLib.Variant("u", 100)},
+                            "org.freedesktop.NetworkManager.Device.Wireless": {
+                                "ActiveAccessPoint": GLib.Variant("o", "/ap")}},
+                        "/ap": {"org.freedesktop.NetworkManager.AccessPoint": {
+                            "Ssid": GLib.Variant("ay", b"A very long wireless network name"),
+                            "Strength": GLib.Variant("y", 83)}},
+                    },
+                    "bt": {"/adapter": {"org.bluez.Adapter1": {"Powered": GLib.Variant("b", True)}}},
+                }
+                for index, label in enumerate(["A long Bluetooth keyboard name", "Headphones", "Mouse", "Trackpad"]):
+                    fake["bt"][f"/device{index}"] = {
+                        "org.bluez.Device1": {"Connected": GLib.Variant("b", True),
+                                              "Alias": GLib.Variant("s", label)}}
+                    if index != 1:
+                        fake["bt"][f"/device{index}"]["org.bluez.Battery1"] = {
+                            "Percentage": GLib.Variant("y", 0 if index == 0 else 80)}
+                calls = {"nm": 0, "bt": 0}
+                manager_info = Gio.DBusNodeInfo.new_for_xml('''<node>
+                  <interface name="org.freedesktop.DBus.ObjectManager">
+                    <method name="GetManagedObjects"><arg type="a{oa{sa{sv}}}" direction="out"/></method>
+                    <signal name="InterfacesAdded"><arg type="o"/><arg type="a{sa{sv}}"/></signal>
+                    <signal name="InterfacesRemoved"><arg type="o"/><arg type="as"/></signal>
+                  </interface></node>''').interfaces[0]
+
+                def managed_call(_connection, _sender, path, _interface, _method, _params, invocation):
+                    key = "nm" if path == "/org/freedesktop" else "bt"
+                    calls[key] += 1
+                    invocation.return_value(GLib.Variant("(a{oa{sa{sv}}})", (fake[key],)))
+
+                registrations = [bus.register_object(path, manager_info, managed_call, None, None)
+                                 for path in ("/org/freedesktop", "/")]
+                owners = [Gio.bus_own_name_on_connection(bus, name, Gio.BusNameOwnerFlags.NONE, None, None)
+                          for name in ("org.freedesktop.NetworkManager", "org.bluez")]
+
+                def wifi_change():
+                    bus.emit_signal(None, "/ap", "org.freedesktop.DBus.Properties", "PropertiesChanged",
+                                    GLib.Variant("(sa{sv}as)", (
+                                        "org.freedesktop.NetworkManager.AccessPoint",
+                                        fake["nm"]["/ap"]["org.freedesktop.NetworkManager.AccessPoint"], [])))
+
+                def gpu_samples():
+                    return (root / "server.log").read_text().count("gpu snapshot:")
+
+                try:
+                    pump(0.1)
+                    dashboard_config = dict(original_config, widgets=["dashboard", "notifications"],
+                                            **{"control-center-width": 448, "widget-config": {
+                                                "system-stats": {"interval": 1}, "battery": {"interval": 1},
+                                                "gpu": {"interval": 1}}})
+                    config.write_text(json.dumps(dashboard_config))
+                    call("ReloadConfig", "()", ())
+                    pump(0.3)
+                    assert calls == {"nm": 0, "bt": 0}, ("hidden dashboard read wireless data", calls)
+                    before_gpu = gpu_samples()
+                    call("SetVisibility", "(b)", (True,))
+                    pump(1.3)
+                    assert calls == {"nm": 1, "bt": 1}, calls
+                    assert gpu_samples() >= before_gpu + 2, "nested GPU timer did not start"
+                    if dashboard_screenshot:
+                        subprocess.run(["niri", "msg", "action", "screenshot-screen", "--path",
+                                        str(Path(dashboard_screenshot).resolve())], env=env, check=True,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                    before = calls.copy()
+                    fake["nm"]["/ap"]["org.freedesktop.NetworkManager.AccessPoint"]["Strength"] = GLib.Variant("y", 55)
+                    for _ in range(10):
+                        wifi_change()
+                    pump(0.4)
+                    assert calls == {"nm": before["nm"] + 1, "bt": before["bt"]}, calls
+                    del fake["bt"]["/device3"]
+                    bus.emit_signal(None, "/", "org.freedesktop.DBus.ObjectManager", "InterfacesRemoved",
+                                    GLib.Variant("(oas)", ("/device3", ["org.bluez.Device1", "org.bluez.Battery1"])))
+                    pump(0.4)
+                    assert calls["bt"] == before["bt"] + 1, calls
+                    before = calls.copy()
+                    call("ReloadConfig", "()", ())
+                    pump(0.4)
+                    assert calls == {key: value + 1 for key, value in before.items()}, calls
+                    before = calls.copy()
+                    wifi_change()
+                    pump(0.4)
+                    assert calls["nm"] == before["nm"] + 1, "reload leaked wireless subscriptions"
+                    Gio.bus_unown_name(owners.pop())
+                    pump(0.4)
+                    owners.append(Gio.bus_own_name_on_connection(bus, "org.bluez", Gio.BusNameOwnerFlags.NONE, None, None))
+                    pump(0.4)
+                    assert calls["bt"] == before["bt"] + 1, "Bluetooth service restart did not refresh"
+                    call("SetVisibility", "(b)", (False,))
+                    pump(0.1)
+                    before = calls.copy(); before_gpu = gpu_samples(); before_cpu = sample_counts()
+                    wifi_change()
+                    pump(1.2)
+                    assert calls == before and gpu_samples() == before_gpu and sample_counts() == before_cpu, \
+                        "closed dashboard retained subscriptions/timers"
+                    call("SetVisibility", "(b)", (True,))
+                    pump(0.4)
+                    assert calls == {key: value + 1 for key, value in before.items()}
+                    config.write_text(json.dumps(original_config))
+                    call("ReloadConfig", "()", ())
+                    pump(0.1)
+                    before = calls.copy(); before_gpu = gpu_samples()
+                    wifi_change(); pump(1.2)
+                    assert calls == before and gpu_samples() == before_gpu, "removed dashboard retained work"
+                    call("SetVisibility", "(b)", (False,))
+                    print(json.dumps({"result": "passed", "proof": "two-column dashboard lifecycle",
+                                      "checks": ["nested refresh", "coalesced Wi-Fi signals", "Bluetooth removal",
+                                                 "service restart", "open reload", "hidden idle", "removal cleanup"]}))
+                finally:
+                    for owner in owners:
+                        Gio.bus_unown_name(owner)
+                    for registration in registrations:
+                        bus.unregister_object(registration)
+
+                # Screenshots can issue their own notifications. Start the action
+                # cases with a fresh sequence so the restart ID reuse is controlled.
+                server.terminate(); server.wait(timeout=3)
+                server = start()
                 a = notify("older")
                 a_revision = snapshot(a)["revision"]
                 pump(0.3)
@@ -393,6 +528,7 @@ def run(binary, client_test):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True)
+    parser.add_argument("--dashboard-screenshot")
     parser.add_argument("--client-test", nargs=argparse.REMAINDER, default=[])
     args = parser.parse_args()
     if os.environ.get("SWAYNC_PRIVATE_ACTION_TEST") != "1":
@@ -405,7 +541,9 @@ if __name__ == "__main__":
                               '<allow eavesdrop="true"/></policy></busconfig>')
             command = ["dbus-run-session", "--config-file", str(config), "--", sys.executable,
                        __file__, "--binary", str(Path(args.binary).resolve())]
+            if args.dashboard_screenshot:
+                command += ["--dashboard-screenshot", str(Path(args.dashboard_screenshot).resolve())]
             if args.client_test:
                 command += ["--client-test", *args.client_test]
             raise SystemExit(subprocess.call(command, env=env))
-    run(args.binary, args.client_test)
+    run(args.binary, args.client_test, args.dashboard_screenshot)

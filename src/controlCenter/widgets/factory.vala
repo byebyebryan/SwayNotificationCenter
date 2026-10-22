@@ -43,6 +43,9 @@ namespace SwayNotificationCenter.Widgets {
             case "system-stats":
                 widget = new SystemStats (suffix);
                 break;
+            case "dashboard":
+                widget = new Dashboard (suffix);
+                break;
             case "battery":
                 widget = new Battery (suffix);
                 break;

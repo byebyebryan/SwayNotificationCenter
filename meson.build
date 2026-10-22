@@ -36,6 +36,15 @@ system_data_test = executable('system-data-test',
 )
 test('system-data', system_data_test)
 
+dashboard_data_test = executable('dashboard-data-test',
+  ['tests/dashboard-data.vala',
+   'src/controlCenter/widgets/shared/systemData.vala',
+   'src/controlCenter/widgets/shared/gpuData.vala',
+   'src/controlCenter/widgets/shared/wirelessData.vala'],
+  dependencies: [dependency('gio-2.0'), cc.find_library('m')],
+)
+test('dashboard-data', dashboard_data_test)
+
 meson.add_devenv(dev_env)
 
 conf_data = configuration_data()

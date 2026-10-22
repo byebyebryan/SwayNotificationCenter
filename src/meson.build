@@ -30,6 +30,10 @@ widget_sources = [
   'controlCenter/widgets/shared/toggleButton.vala',
   'controlCenter/widgets/shared/pollingWidget.vala',
   'controlCenter/widgets/shared/systemData.vala',
+  'controlCenter/widgets/shared/gpuData.vala',
+  'controlCenter/widgets/shared/wirelessData.vala',
+  'controlCenter/widgets/shared/busWidget.vala',
+  'controlCenter/widgets/dashboard/dashboard.vala',
   'controlCenter/widgets/systemStats/systemStats.vala',
   'controlCenter/widgets/battery/battery.vala',
   # Widget: Notifications

@@ -11,3 +11,42 @@
     font-feature-settings: "tnum";
   }
 }
+
+.widget-dashboard {
+  padding: 0;
+  background: transparent;
+  border: none;
+
+  .dashboard-card {
+    margin: 0;
+    padding: 12px;
+    border: var(--border);
+    background: var(--noti-bg-darker);
+  }
+
+  .dashboard-card-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .metric-label {
+    color: var(--text-color-disabled);
+  }
+
+  .metric-value {
+    font-feature-settings: "tnum";
+  }
+
+  .widget-gpu {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+  }
+
+  .bluetooth-more {
+    padding: 3px 0;
+    min-height: 0;
+    border-radius: 0;
+  }
+}

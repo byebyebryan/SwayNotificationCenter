@@ -8,17 +8,27 @@ namespace SwayNotificationCenter.Widgets {
         SystemData.CpuTimes ?previous = null;
         Gtk.Label cpu_value;
         Gtk.Label memory_value;
+        bool compact;
+        GpuStats ?gpu;
 
-        public SystemStats (string suffix) {
+        public SystemStats (string suffix, bool compact = false) {
             base (suffix);
+            this.compact = compact;
+            if (compact) {
+                add_heading ("System");
+            }
             configure_interval (1);
             var grid = new Gtk.Grid ();
-            grid.column_spacing = 16;
+            grid.column_spacing = compact ? 6 : 16;
             grid.row_spacing = 8;
             grid.hexpand = true;
             cpu_value = add_metric (grid, 0, "CPU");
             memory_value = add_metric (grid, 1, "RAM");
             append (grid);
+            if (compact) {
+                gpu = new GpuStats (suffix);
+                append (gpu);
+            }
         }
 
         protected override void reset_sample () {
@@ -43,10 +53,23 @@ namespace SwayNotificationCenter.Widgets {
                 memory_value.label = "%.1f / %.1f GiB · %.0f%%".printf (
                     sample.memory_used_gib, sample.memory_total_gib,
                     100 * sample.memory_used_gib / sample.memory_total_gib);
+                memory_value.tooltip_text = memory_value.label;
+                if (compact) {
+                    memory_value.label = "%.1f GiB · %.0f%%".printf (sample.memory_used_gib,
+                                                                     100 * sample.memory_used_gib /
+                                                                     sample.memory_total_gib);
+                }
             } else {
                 memory_value.label = "—";
             }
             debug ("system-stats sample: CPU %s; RAM %s", cpu_value.label, memory_value.label);
+        }
+
+        public override void on_cc_visibility_change (bool visible) {
+            base.on_cc_visibility_change (visible);
+            if (gpu != null) {
+                gpu.on_cc_visibility_change (visible);
+            }
         }
     }
 }
