@@ -149,6 +149,11 @@
     font-feature-settings: "tnum";
   }
 
+  .information-connection-label,
+  .information-network-activity .metric-label {
+    color: var(--text-color-disabled);
+  }
+
   .information-battery-meter .information-meter-value {
     font-weight: 700;
   }

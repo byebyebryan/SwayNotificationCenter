@@ -55,9 +55,25 @@ meters appear only for runtime-active NVIDIA devices. Unknown readings show an
 unavailable placeholder and do not create a zero-valued bar.
 
 Connections combines the primary NetworkManager link and up to two connected
-Bluetooth devices per row. Ethernet shows an Ethernet symbol and name on the
-left, with its IPv4 address on the right or IPv6 when IPv4 is unavailable.
-Wi-Fi shows its SSID and signal glyph/percentage. Bluetooth symbols use BlueZ
+Bluetooth devices per row. Its networking row uses two equal columns, each with
+two lines. The left column shows a Wi-Fi symbol and SSID above a `Signal` label
+and right-aligned percentage. Ethernet uses a wired symbol and `Ethernet` above
+an `IP` label and right-aligned IPv4 address, falling back to IPv6. Signal/IP
+labels are muted; values use the same foreground, font and tabular digits as
+System. Signal uses the shared percentage formatter, including figure-space
+padding for single digits and `—` for an unknown value. Full SSIDs and addresses
+remain available in tooltips when ellipsized.
+
+The right column shows `↑ Up` and `↓ Down`, with right-aligned transfer rates.
+Byte counters come only from the displayed primary interface, using decimal
+B/s, KB/s, MB/s and larger units as needed. Rates sample once per second while
+the panel is open; there is no traffic sampling for legacy network/dashboard
+widgets. A fresh opening or interface change needs a new baseline, so rates
+initially show `—`. Missing counters and counter resets also discard the old
+baseline; a measured idle link shows `0 B/s`. Closing, reloading, removing the
+widget or losing the primary link cancels reads and stops the rate timer.
+
+Bluetooth symbols use BlueZ
 `Device1.Icon` metadata where the active theme provides it, with a generic
 Bluetooth fallback; device names have full tooltips and battery `0%` remains
 distinct from an unreported battery. Additional devices can be expanded, and

@@ -10,11 +10,58 @@ namespace SwayNotificationCenter.WidgetTests {
     Gtk.CssProvider ?fixture_css_provider = null;
     uint fixture_css_errors = 0;
 
+    class NetworkActivityFixture : Widgets.NetworkActivity {
+        public uint reads = 0;
+        public uint cancelled = 0;
+        public uint delay_ms = 0;
+        public string[] interfaces = {};
+        int64 now_us = 0;
+        uint64 rx_bytes = 0;
+        uint64 tx_bytes = 0;
+
+        public NetworkActivityFixture () {
+            base ("");
+        }
+
+        protected override async NetworkData.Counters ?read_counters (
+            string selected, Cancellable cancellable) {
+            reads++;
+            interfaces += selected;
+            if (delay_ms > 0) {
+                Timeout.add (delay_ms, () => {
+                    read_counters.callback ();
+                    return Source.REMOVE;
+                });
+                yield;
+            }
+            if (cancellable.is_cancelled ()) {
+                cancelled++;
+                return null;
+            }
+            now_us += 1000000;
+            rx_bytes += 1800000;
+            tx_bytes += 24000;
+            var counters = new NetworkData.Counters ();
+            counters.rx_bytes = rx_bytes;
+            counters.tx_bytes = tx_bytes;
+            return counters;
+        }
+
+        protected override int64 sample_time () {
+            return now_us;
+        }
+    }
+
     class NetworkFixture : Widgets.Network {
         public uint visibility_calls = 0;
+        public NetworkActivityFixture ?rates = null;
 
         public NetworkFixture (bool information = false) {
             base ("", information);
+            if (information) {
+                rates = new NetworkActivityFixture ();
+                replace_activity_widget (rates);
+            }
         }
 
         public void seed (Variant ?snapshot) {
@@ -25,6 +72,9 @@ namespace SwayNotificationCenter.WidgetTests {
             visibility_calls++;
             if (visible) {
                 apply_snapshot (null);
+                if (rates != null) {
+                    rates.on_cc_visibility_change (true);
+                }
             } else {
                 base.on_cc_visibility_change (false);
             }
@@ -582,6 +632,74 @@ namespace SwayNotificationCenter.WidgetTests {
         formatted.on_cc_visibility_change (false);
     }
 
+    void test_network_activity_lifecycle () {
+        var network = new NetworkFixture (true);
+        var rates = network.rates;
+        var window = new Gtk.Window ();
+        window.set_default_size (448, 160);
+        window.set_child (network);
+        app.add_window (window);
+        window.present ();
+        network.seed (wifi_snapshot (72));
+        assert (rates.reads == 0);
+
+        network.on_cc_visibility_change (true);
+        network.seed (wifi_snapshot (72));
+        var upload = find_label_class (network, "information-upload-value");
+        var download = find_label_class (network, "information-download-value");
+        assert_nonnull (upload);
+        assert_nonnull (download);
+        assert (upload.label == "—" && download.label == "—");
+        wait_for_timeout (1100);
+        assert (rates.reads == 2);
+        assert (upload.label == "24 KB/s" && download.label == "1.8 MB/s");
+        assert_null (gtk_test_accessible_check_property (
+                         upload, Gtk.AccessibleProperty.LABEL, "Upload transfer rate"));
+
+        // Signal/IP updates on the same interface must not restart sampling.
+        uint reads = rates.reads;
+        network.seed (wifi_snapshot (7));
+        assert (rates.reads == reads && upload.label == "24 KB/s");
+
+        // An old interface's delayed completion cannot publish over the new one
+        // or clear its in-flight guard. The new link needs its own baseline.
+        rates.delay_ms = 200;
+        network.seed (ethernet_snapshot ("192.0.2.10"));
+        assert (upload.label == "—" && download.label == "—");
+        assert (rates.interfaces[rates.interfaces.length - 1] == "enp1s0");
+        rates.delay_ms = 0;
+        network.seed (wifi_snapshot (72));
+        assert (upload.label == "—" && download.label == "—");
+        wait_for_timeout (250);
+        assert (rates.cancelled == 1 && upload.label == "—");
+        wait_for_timeout (850);
+        assert (upload.label == "24 KB/s" && download.label == "1.8 MB/s");
+
+        // Service loss retires sampling while the subscription owner can recover.
+        network.seed (snapshot ("{}"));
+        assert (!network.visible && upload.label == "—");
+        reads = rates.reads;
+        wait_for_timeout (1100);
+        assert (rates.reads == reads);
+        network.seed (wifi_snapshot (72));
+        assert (upload.label == "—");
+        network.on_cc_visibility_change (false);
+        reads = rates.reads;
+        wait_for_timeout (1100);
+        assert (rates.reads == reads);
+
+        rates.delay_ms = 200;
+        network.on_cc_visibility_change (true);
+        network.seed (wifi_snapshot (72));
+        assert (upload.label == "—");
+        window.set_child (null);
+        window.destroy ();
+        reads = rates.reads;
+        wait_for_timeout (1100);
+        assert (rates.reads == reads && rates.cancelled == 2);
+        assert (upload.label == "—" && download.label == "—");
+    }
+
     void test_information_widget () {
         assert_nonnull (fixture_css_provider);
         assert (fixture_css_errors == 0);
@@ -717,11 +835,14 @@ namespace SwayNotificationCenter.WidgetTests {
         assert (!battery_heading.get_parent ().visible);
         assert (visible_css_count (information, "information-divider") == 1);
 
-        // Ethernet uses a labelled icon cell and a right-aligned IP value.
+        // Ethernet identity sits above its IP label/value, beside traffic rates.
         network.seed (ethernet_snapshot ("192.0.2.10"));
         assert (connection_heading.get_parent ().visible);
         assert (visible_css_count (information, "information-divider") == 2);
         assert (find_label_text (network, "Ethernet") != null);
+        assert_nonnull (find_label_text (network, "IP"));
+        assert_nonnull (find_label_text (network, "↑ Up"));
+        assert_nonnull (find_label_text (network, "↓ Down"));
         Gtk.Label ?ip = find_label_text (network, "192.0.2.10");
         assert_nonnull (ip);
         assert (ip.xalign == 1 && ip.single_line_mode);
@@ -729,12 +850,23 @@ namespace SwayNotificationCenter.WidgetTests {
         assert (ip.tooltip_text == "192.0.2.10");
         wait_for_timeout (80);
         assert (ip.get_width () > 80 && !ip.get_layout ().is_ellipsized ());
+        Graphene.Rect ip_bounds;
+        Graphene.Rect cpu_information_bounds;
+        assert (ip.compute_bounds (information, out ip_bounds));
+        assert (cpu_meter.compute_bounds (information, out cpu_information_bounds));
+        assert (Math.fabs (ip_bounds.get_x () + ip_bounds.get_width () -
+                           cpu_information_bounds.get_x () - cpu_information_bounds.get_width ()) <
+                1);
+        assert (ip.get_color ().equal (zero_cpu.get_color ()));
+        assert (ip.get_pango_context ().get_font_description ().equal (
+                    zero_cpu.get_pango_context ().get_font_description ()));
         string ?ethernet_capture = Environment.get_variable ("SWAYNC_PRIVATE_WIDGET_SCREENSHOT");
         if (ethernet_capture != null) {
+            wait_for_timeout (1100);
             capture_widget (window, information, ethernet_capture + "-ethernet.png");
         }
 
-        // IPv6 fallback stays constrained to the right cell at the configured width.
+        // IPv6 fallback stays within the connection half, retaining its full tooltip.
         string long_ipv6 = "2001:db8:abcd:1234:5678:90ab:cdef:1234";
         network.seed (ethernet_snapshot (long_ipv6, true));
         drain ();
@@ -743,6 +875,21 @@ namespace SwayNotificationCenter.WidgetTests {
         assert_nonnull (ip);
         assert (ip.tooltip_text == long_ipv6 && ip.get_width () < 300);
         assert (information.get_width () <= 448 && network.get_width () <= 448);
+
+        // Signal reuses the same label/value row and percentage format as System.
+        foreach (uint signal in new uint[] { 0, 7, 82, 100 }) {
+            network.seed (wifi_snapshot (signal));
+            var signal_label = find_label_text (network, "Signal");
+            var value = find_label_class_text (network, "information-connection-value",
+                                               SystemData.percentage (signal));
+            assert_nonnull (signal_label);
+            assert_nonnull (value);
+            assert (value.xalign == 1 &&
+                    signal_label.has_css_class ("information-connection-label"));
+            assert (value.get_color ().equal (zero_cpu.get_color ()));
+            assert (value.get_pango_context ().get_font_description ().equal (
+                        zero_cpu.get_pango_context ().get_font_description ()));
+        }
 
         // Unknown Wi-Fi strength uses the generic wireless glyph and an unknown
         // percentage instead of the full-strength icon.
@@ -830,10 +977,11 @@ namespace SwayNotificationCenter.WidgetTests {
         assert (find_label_text (battery, "BAT0 ·") != null);
         assert (find_label_text (battery, "BAT1 ·") != null);
         battery.seed ({ resting });
-        network.seed (wifi_snapshot (72));
+        network.seed (wifi_snapshot (7));
 
         string ?screenshot = Environment.get_variable ("SWAYNC_PRIVATE_WIDGET_SCREENSHOT");
         if (screenshot != null) {
+            wait_for_timeout (1100);
             drain ();
             capture_widget (window, information, screenshot);
         }
@@ -968,6 +1116,7 @@ namespace SwayNotificationCenter.WidgetTests {
                            test_clock_lifecycle_and_formats);
             Test.add_func ("/widgets/clock-reload-removal", test_clock_reload_removal);
             Test.add_func ("/widgets/information-composite", test_information_widget);
+            Test.add_func ("/widgets/network-activity-lifecycle", test_network_activity_lifecycle);
             int result = Test.run ();
             control_center.destroy ();
             FileUtils.remove (config);

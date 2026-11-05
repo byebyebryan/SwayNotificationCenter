@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix="swaync-widget-tests-") as directory:
     process = subprocess.Popen(["dbus-run-session", "--config-file", str(bus), "--",
                                 "xvfb-run", "-a", str(binary)], env=env, start_new_session=True)
     try:
-        raise SystemExit(process.wait(timeout=30))
+        raise SystemExit(process.wait(timeout=45))
     except subprocess.TimeoutExpired:
         os.killpg(process.pid, signal.SIGTERM)
         process.wait(timeout=5)

@@ -32,6 +32,8 @@ widget_sources = [
   'controlCenter/widgets/shared/systemData.vala',
   'controlCenter/widgets/shared/gpuData.vala',
   'controlCenter/widgets/shared/wirelessData.vala',
+  'controlCenter/widgets/shared/networkData.vala',
+  'controlCenter/widgets/shared/networkActivity.vala',
   'controlCenter/widgets/shared/informationMeter.vala',
   'controlCenter/widgets/shared/busWidget.vala',
   'controlCenter/widgets/dashboard/dashboard.vala',

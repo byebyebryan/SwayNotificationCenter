@@ -54,6 +54,12 @@ dashboard_data_test = executable('dashboard-data-test',
 )
 test('dashboard-data', dashboard_data_test)
 
+network_data_test = executable('network-data-test',
+  ['tests/network-data.vala', 'src/controlCenter/widgets/shared/networkData.vala'],
+  dependencies: [dependency('gio-2.0'), cc.find_library('m')],
+)
+test('network-data', network_data_test)
+
 meson.add_devenv(dev_env)
 
 conf_data = configuration_data()

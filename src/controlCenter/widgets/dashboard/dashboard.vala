@@ -183,9 +183,10 @@ namespace SwayNotificationCenter.Widgets {
         Gtk.Box signal_row;
         bool information;
         Gtk.Box ?information_left = null;
-        Gtk.Box ?information_right = null;
+        Gtk.Box ?information_columns = null;
+        Gtk.Label ?information_detail_label = null;
         Gtk.Widget ?information_icon = null;
-        Gtk.Widget ?signal_icon = null;
+        NetworkActivity ?activity = null;
 
         public Network (string suffix, bool information = false) {
             base (suffix, "org.freedesktop.NetworkManager", "/org/freedesktop");
@@ -226,23 +227,28 @@ namespace SwayNotificationCenter.Widgets {
                 network_row.add_css_class ("information-connection-name");
                 network_name.xalign = 0;
                 information_left = network_row;
+                information_columns = row;
+                row.add_css_class ("information-connection-columns");
+                information_detail_label = signal_label;
+                signal_label.add_css_class ("information-connection-label");
+                signal_row.add_css_class ("information-connection-details");
+                signal_row.append (strength);
                 network_label.visible = false;
                 information_icon = InformationIcons.symbol ("network-transmit-receive-symbolic",
                                                             "network-transmit-receive",
                                                             "Network");
                 network_row.prepend (information_icon);
-                information_right = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
-                information_right.hexpand = true;
-                information_right.halign = Gtk.Align.FILL;
-                signal_icon = InformationIcons.symbol ("network-wireless-symbolic",
-                                                       "network-wireless",
-                                                       "Wi-Fi signal", "▂▄▆█");
-                information_right.append (signal_icon);
-                information_right.append (strength);
+                var connection_cell = new Gtk.Box (Gtk.Orientation.VERTICAL, 4);
+                connection_cell.hexpand = true;
+                connection_cell.valign = Gtk.Align.START;
+                connection_cell.add_css_class ("information-connection-cell");
+                connection_cell.append (network_row);
+                connection_cell.append (signal_row);
+                activity = new NetworkActivity (suffix);
                 strength.label = "—";
                 strength.add_css_class ("information-connection-value");
-                row.append (information_left);
-                row.append (information_right);
+                row.append (connection_cell);
+                row.append (activity);
             } else {
                 signal_row.append (strength);
                 // Keep the second column allocated when its Wi-Fi content is hidden.
@@ -253,6 +259,29 @@ namespace SwayNotificationCenter.Widgets {
                 row.append (signal_cell);
             }
             append (row);
+        }
+
+        protected void replace_activity_widget (NetworkActivity replacement) {
+            if (activity != null) {
+                activity.on_cc_visibility_change (false);
+                information_columns.remove (activity);
+            }
+            activity = replacement;
+            information_columns.append (activity);
+        }
+
+        public override void on_cc_visibility_change (bool visible) {
+            base.on_cc_visibility_change (visible);
+            if (activity != null) {
+                activity.on_cc_visibility_change (visible);
+            }
+        }
+
+        public override void unroot () {
+            if (activity != null) {
+                activity.on_cc_visibility_change (false);
+            }
+            base.unroot ();
         }
 
         protected override bool watches_interface (string iface) {
@@ -299,6 +328,12 @@ namespace SwayNotificationCenter.Widgets {
             string fallback = sample.kind == "ETH" ? "network-wired"
                 : sample.kind == "WIFI" ? "network-wireless"
                 : "network-transmit-receive";
+            if (sample.kind == "WIFI" && sample.strength >= 0) {
+                string level = sample.strength >= 80 ? "excellent" : sample.strength >= 55 ? "good"
+                    : sample.strength >= 30 ? "ok" : sample.strength > 0 ? "weak" : "none";
+                icon_name = "network-wireless-signal-%s-symbolic".printf (level);
+                fallback = "network-wireless-signal-%s".printf (level);
+            }
             if (information_icon != null) {
                 information_left.remove (information_icon);
             }
@@ -308,34 +343,23 @@ namespace SwayNotificationCenter.Widgets {
                                                           : "Network");
             information_left.prepend (information_icon);
             if (sample.kind == "WIFI") {
+                information_detail_label.label = "Signal";
                 strength.label = SystemData.percentage (sample.strength);
-                string level = sample.strength >= 80 ? "excellent" : sample.strength >= 55 ? "good"
-                    : sample.strength >= 30 ? "ok" : sample.strength > 0 ? "weak" : "none";
-                string signal_name = sample.strength >= 0
-                    ? "network-wireless-signal-%s-symbolic".printf (level)
-                    : "network-wireless-symbolic";
-                string signal_fallback = sample.strength >= 0
-                    ? "network-wireless-signal-%s".printf (level) : "network-wireless";
-                information_right.remove (signal_icon);
-                signal_icon = InformationIcons.symbol (signal_name, signal_fallback,
-                                                       "Wi-Fi signal");
-                information_right.prepend (signal_icon);
                 network_name.tooltip_text = sample.name;
-                information_right.tooltip_text = sample.strength >= 0
+                strength.tooltip_text = sample.strength >= 0
                     ? "Wi-Fi signal: %s".printf (SystemData.percentage (sample.strength))
                     : "Wi-Fi signal unavailable";
-                strength.tooltip_text = information_right.tooltip_text;
-                signal_icon.add_css_class (sample.strength >= 0
-                                           ? "information-wifi-signal-known"
-                                           : "information-wifi-signal-unknown");
+                information_icon.add_css_class (sample.strength >= 0
+                                                ? "information-wifi-signal-known"
+                                                : "information-wifi-signal-unknown");
             } else {
+                information_detail_label.label = "IP";
                 strength.label = sample.address != "" ? sample.address : "—";
-                signal_icon.visible = false;
                 network_name.tooltip_text = sample.kind == "ETH" ? "Ethernet" : sample.state;
-                information_right.tooltip_text = sample.address != ""
+                strength.tooltip_text = sample.address != ""
                     ? sample.address : "IP address unavailable";
-                strength.tooltip_text = information_right.tooltip_text;
             }
+            activity.select_interface (sample.state == "Connected" ? sample.interface_name : "");
             if (sample.interface_name != "") {
                 network_name.tooltip_text += " · " + sample.interface_name;
             }

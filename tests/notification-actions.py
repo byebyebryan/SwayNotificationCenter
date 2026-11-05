@@ -287,6 +287,9 @@ def run(binary, client_test, dashboard_screenshot=None, information=False, style
                     text = (root / "server.log").read_text()
                     return text.count("gpu snapshot:") + text.count("gpu information snapshot:")
 
+                def activity_samples():
+                    return (root / "server.log").read_text().count("network activity sample:")
+
                 def bluetooth_visible():
                     lines = [line for line in (root / "server.log").read_text().splitlines()
                              if "bluetooth devices:" in line]
@@ -304,11 +307,16 @@ def run(binary, client_test, dashboard_screenshot=None, information=False, style
                     call("ReloadConfig", "()", ())
                     pump(0.3)
                     assert calls == {"nm": 0, "bt": 0}, ("hidden dashboard read wireless data", calls)
+                    before_activity = activity_samples()
                     before_gpu = gpu_samples()
                     call("SetVisibility", "(b)", (True,))
                     pump(1.3)
                     assert calls == {"nm": 1, "bt": 1}, calls
                     assert gpu_samples() >= before_gpu + 2, "nested GPU timer did not start"
+                    if information:
+                        assert activity_samples() >= before_activity + 2, "primary-link rate sampler did not start"
+                    else:
+                        assert activity_samples() == before_activity, "legacy dashboard started the new sampler"
                     if dashboard_screenshot:
                         capture_panel(dashboard_screenshot)
                     before = calls.copy()
@@ -368,22 +376,36 @@ def run(binary, client_test, dashboard_screenshot=None, information=False, style
                     pump(0.4)
                     assert calls["bt"] == before["bt"] + 1, "Bluetooth service restart did not refresh"
                     assert bluetooth_visible(), "Bluetooth card did not recover after service restart"
+                    if information:
+                        Gio.bus_unown_name(owners.pop(0))
+                        pump(0.4)
+                        assert "Disconnected" in network_sample(), "NetworkManager loss retained the old link"
+                        before_activity = activity_samples()
+                        pump(1.2)
+                        assert activity_samples() == before_activity, "missing primary link retained rate sampling"
+                        owners.append(Gio.bus_own_name_on_connection(
+                            bus, "org.freedesktop.NetworkManager", Gio.BusNameOwnerFlags.NONE, None, None))
+                        pump(1.3)
+                        assert activity_samples() >= before_activity + 2, "NetworkManager recovery did not restart rates"
                     call("SetVisibility", "(b)", (False,))
                     pump(0.1)
                     before = calls.copy(); before_gpu = gpu_samples(); before_cpu = sample_counts()
+                    before_activity = activity_samples()
                     wifi_change()
                     pump(1.2)
                     assert calls == before and gpu_samples() == before_gpu and sample_counts() == before_cpu, \
                         "closed dashboard retained subscriptions/timers"
+                    assert activity_samples() == before_activity, "closed information panel retained network sampling"
                     call("SetVisibility", "(b)", (True,))
                     pump(0.4)
                     assert calls == {key: value + 1 for key, value in before.items()}
                     config.write_text(json.dumps(original_config))
                     call("ReloadConfig", "()", ())
                     pump(0.1)
-                    before = calls.copy(); before_gpu = gpu_samples()
+                    before = calls.copy(); before_gpu = gpu_samples(); before_activity = activity_samples()
                     wifi_change(); pump(1.2)
                     assert calls == before and gpu_samples() == before_gpu, "removed dashboard retained work"
+                    assert activity_samples() == before_activity, "removed information panel retained network sampling"
                     call("SetVisibility", "(b)", (False,))
                     print(json.dumps({"result": "passed", "proof": "information composite lifecycle" if information else "stacked dashboard lifecycle",
                                       "checks": ["nested refresh", "coalesced Wi-Fi signals", "Bluetooth removal",
