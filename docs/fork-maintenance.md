@@ -35,6 +35,7 @@ Avoid rewriting published history or reformatting unrelated upstream files.
 | Retained notification actions | Notification identity/revision and D-Bus hooks in notification model, daemon and action dispatch | Retained/replaced cards, owner routing, notifier restart and ID reuse |
 | Information and legacy status widgets | Fork-owned widget, reader and style files; factory, schema and control-center lifecycle hooks | Data suites, native GTK layout/keyboard checks, private NetworkManager/BlueZ and visibility tests |
 | Clock and inline DND | Clock module and a small title-row/config extension | Formatting, switch binding, reload/removal and timer cleanup |
+| Explicit system stylesheet | Respect custom/skip flags before resolving the installed default in `src/functions.vala` | The clean native compositor fixture runs without an installed SwayNC stylesheet |
 | Arch delivery | `packaging/arch/`; checksum-pinned source and a downstream package release number | Canonical recipe build, package metadata and installed binary/recipe receipts |
 | Personal desktop policy | External Niri Plus appearance and private chezmoi selectors | Their own consumer and per-host deployment checks |
 

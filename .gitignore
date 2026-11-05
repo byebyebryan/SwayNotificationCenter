@@ -9,3 +9,4 @@ SwayNotificationCenter
 ./src/swaync
 ./src/swaync*
 .cache/
+__pycache__/
