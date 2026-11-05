@@ -13,6 +13,12 @@ It adds optional [live CPU/RAM, battery and clock widgets, plus a unified
 information surface](docs/system-widgets.md)
 that refresh only while the notification panel is open.
 
+[![Fork native checks](https://github.com/byebyebryan/SwayNotificationCenter/actions/workflows/fork-checks.yml/badge.svg)](https://github.com/byebyebryan/SwayNotificationCenter/actions/workflows/fork-checks.yml)
+
+Fork contributors: see the [upstream baseline, patch map and maintenance
+workflow](docs/fork-maintenance.md). Native fork regressions have one entrypoint:
+`python tests/check-fork.py --compositor`.
+
 *Note: SwayNotificationCenter only supports Desktops / Window Managers that
 support `wlr_layer_shell_unstable_v1` like Sway or anything wlroots based*
 

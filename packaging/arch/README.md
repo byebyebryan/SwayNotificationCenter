@@ -55,10 +55,11 @@ traces. Bryan confirmed that clicking focused the terminal. The separate
 
 ## Return to upstream
 
-Once an upstream release includes an equivalent fix, remove `swaync-bryan` and
-install `swaync` through pacman or yay. Change chezmoi's package owner at the
-same time so a later apply does not reinstall the fork. Switching the desktop
-notifier to Mako alone preserves the inactive SwayNC package for rollback.
-
-The 349's selected-card Open action is a separate API feature and remains
-disabled by the desktop configuration.
+Qualify equivalents for every selected fork feature before switching packages:
+the activation fix, retained-card action API, information widgets and their
+configuration are independent contracts. An activation fix alone is not enough.
+The [fork maintenance guide](../../docs/fork-maintenance.md) records their source
+and regression boundaries. If a feature is retired instead, update its consumer
+configuration and API callers along with the package owner so a later apply
+does not reinstall the fork. Switching the desktop notifier to Mako alone
+preserves the inactive SwayNC package for rollback.

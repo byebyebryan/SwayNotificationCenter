@@ -1,0 +1,53 @@
+name: Fork native checks
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'data/**', 'tests/**', 'meson*', '.github/workflows/fork-checks.yml']
+  pull_request:
+    branches: [main]
+    paths: ['src/**', 'data/**', 'tests/**', 'meson*', '.github/workflows/fork-checks.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    timeout-minutes: 20
+    steps:
+      - name: Install build and private native test dependencies
+        run: |
+          pacman-key --init
+          pacman -Syu --noconfirm --needed git gtk4 gtk4-layer-shell libadwaita \
+            glib2 libgee json-glib libpulse granite7 vala meson scdoc sassc \
+            gobject-introspection blueprint-compiler python python-gobject \
+            dbus xorg-server-xvfb xorg-xauth niri kitty mesa noto-fonts
+
+      - name: Check out fork source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Prepare an ordinary test user
+        run: |
+          useradd --create-home fork-check
+          chown -R fork-check "$GITHUB_WORKSPACE"
+
+      - name: Check the fork on private displays and buses
+        run: runuser -u fork-check -- python tests/check-fork.py --compositor
+
+      - name: Record the check environment
+        if: always()
+        run: |
+          mkdir -p build/fork-check-artifacts
+          pacman -Q > build/fork-check-artifacts/packages.txt
+
+      - name: Upload native captures and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fork-native-checks
+          path: build/fork-check-artifacts
