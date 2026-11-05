@@ -2,7 +2,7 @@
 pkgname=swaync-bryan
 pkgver=0.12.6
 pkgrel=17
-_commit=de5e00f75d90070c22b148e1e49d7d9422a054cb
+_commit=3d4458262c23ac66820cbb7a63b171bab1053ae8
 pkgdesc="Bryan's SwayNC fork with checked notification actions and unified system information"
 arch=('x86_64')
 url='https://github.com/byebyebryan/SwayNotificationCenter'
@@ -14,7 +14,7 @@ optdepends=('gvfs: Get album art in MPRIS widget'
 provides=("swaync=${pkgver}")
 conflicts=('swaync')
 source=("SwayNotificationCenter-${_commit}.tar.gz::${url}/archive/${_commit}.tar.gz")
-sha256sums=('d5ac483c99914079a375fe40f1646187eedbc610a55e99161a146e28328b3fac')
+sha256sums=('11d591899424a1cdc6a627c53f2b2aab3a91e56fa1ff390ba0d4878806e832e6')
 build() {
     arch-meson "SwayNotificationCenter-${_commit}" build -Dscripting=true
     meson compile -C build
