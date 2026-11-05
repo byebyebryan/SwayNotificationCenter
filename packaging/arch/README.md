@@ -21,7 +21,7 @@ already does this for selected hosts.
 
 ```sh
 rtk proxy makepkg --syncdeps --rmdeps --noconfirm
-rtk proxy sudo pacman -U --noconfirm --ask=4 swaync-bryan-0.12.6-16-x86_64.pkg.tar.zst
+rtk proxy sudo pacman -U --noconfirm --ask=4 swaync-bryan-0.12.6-17-x86_64.pkg.tar.zst
 rtk proxy systemctl --user restart swaync.service
 ```
 
