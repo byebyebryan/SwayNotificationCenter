@@ -349,10 +349,10 @@ namespace SwayNotificationCenter.Widgets {
                 case "Home" :
                     navigate_to_first_notification ();
                     break;
-                case "End":
+                case "End" :
                     navigate_to_last_notification ();
                     break;
-                default:
+                    default :
                     // Pressing 1-9 to activate a notification action
                     for (int i = 0; i < 9; i++) {
                         uint num_keyval = Gdk.keyval_from_name (

@@ -8,5 +8,17 @@
     margin-left: $margin;
     border-radius: var(--border-radius);
   }
+
+  .title-inline-dnd {
+    label {
+      color: var(--text-color-disabled);
+      font-size: 0.85rem;
+    }
+
+    switch {
+      margin: 0;
+      border-radius: var(--border-radius);
+    }
+  }
 }
 

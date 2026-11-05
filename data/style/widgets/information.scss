@@ -1,0 +1,181 @@
+.widget-information {
+  margin: 16px 16px 8px;
+  padding: 0;
+  border: 1px solid var(--information-border-color, var(--noti-border-color));
+  border-radius: 0;
+  background: var(--information-bg, var(--noti-bg-darker));
+  color: var(--text-color);
+
+  .widget {
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .information-clock {
+    margin: 0;
+    padding: 12px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    min-width: 0;
+
+    .clock-time {
+      color: var(--text-color);
+      font-weight: 700;
+      font-feature-settings: "tnum";
+    }
+
+    .clock-date {
+      color: var(--text-color);
+      font-weight: 400;
+      font-feature-settings: "tnum";
+    }
+  }
+
+  .information-divider {
+    min-height: 1px;
+    background: var(--information-border-color, var(--noti-border-color));
+  }
+
+  .information-section {
+    padding: 12px;
+    min-width: 0;
+  }
+
+  .information-section-title {
+    margin: 0;
+    color: var(--information-heading-color, var(--text-color-disabled));
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .information-meter {
+    min-width: 0;
+  }
+
+  .information-meter-heading,
+  .information-meter-name-group {
+    min-width: 0;
+  }
+
+  .information-meter-label {
+    color: var(--text-color-disabled);
+    min-width: 0;
+  }
+
+  .information-meter-value {
+    color: var(--text-color);
+    font-feature-settings: "tnum";
+  }
+
+  .information-meter-track {
+    min-height: 4px;
+  }
+
+  .information-meter-level {
+    min-height: 4px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+
+    trough {
+      min-height: 4px;
+      min-width: 0;
+      margin: 0;
+      padding: 0;
+      border: none;
+      border-radius: 1px;
+      background: var(--information-meter-track, #151719);
+
+      block {
+        min-height: 4px;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+        border: none;
+      }
+
+      block.filled {
+        border-radius: 1px;
+        background: var(--information-meter-fill, #6eafff);
+      }
+
+      block.empty {
+        background: transparent;
+      }
+    }
+  }
+
+  .information-meter-unavailable,
+  .information-meter-detail {
+    color: var(--text-color-disabled);
+    font-size: 0.82rem;
+    font-feature-settings: "tnum";
+  }
+
+  .information-meter-charging .information-meter-level trough block.filled {
+    background: var(--information-meter-charging, #a9d180);
+  }
+
+  .information-meter-warning .information-meter-level trough block.filled {
+    background: var(--information-meter-warning, #e9b55f);
+  }
+
+  .information-meter-critical .information-meter-level trough block.filled {
+    background: var(--information-meter-critical, #f27d78);
+  }
+
+  .information-limit-marker {
+    color: var(--information-heading-color, var(--text-color-disabled));
+  }
+
+  .information-symbol {
+    min-width: 16px;
+    color: var(--text-color-disabled);
+  }
+
+  .information-connection-name,
+  .information-device,
+  .information-device-name {
+    min-width: 0;
+  }
+
+  .information-connection-value,
+  .information-device-value {
+    color: var(--text-color);
+    font-feature-settings: "tnum";
+  }
+
+  .information-battery-meter .information-meter-value {
+    font-weight: 700;
+  }
+
+  .information-battery-state {
+    color: var(--text-color);
+    min-width: 0;
+    font-size: 0.9rem;
+  }
+
+  .information-battery-warning {
+    color: var(--information-meter-warning, #e9b55f);
+  }
+
+  .information-battery-critical {
+    color: var(--information-meter-critical, #f27d78);
+    font-weight: 600;
+  }
+
+  .information-more {
+    margin: 0;
+    padding: 2px 0;
+    min-height: 0;
+    color: var(--text-color-disabled);
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}

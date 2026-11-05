@@ -347,6 +347,10 @@ config file to be able to detect config errors
 			optional: true ++
 		*calendar*++
 			optional: true ++
+		*clock*++
+			optional: true ++
+		*information*++
+			optional: true ++
 		*inhibitors*++
 			optional: true ++
 	description: ++
@@ -407,7 +411,12 @@ config file to be able to detect config errors
 					optional: true ++
 					default: "Clear All" ++
 					description: "Clear All" button text ++
-			description: The notification visibility state. ++
+				show-dnd: ++
+					type: bool ++
+					optional: true ++
+					default: false ++
+					description: Show a compact Do Not Disturb switch beside the title and Clear All action ++
+			description: Notifications heading with optional DND switch and Clear All action. ++
 		*dnd*++
 			type: object ++
 			css class: widget-dnd ++
@@ -682,6 +691,29 @@ config file to be able to detect config errors
 				Charging ETA requires a reported charge_control_end_threshold and targets that percentage. ++
 				Discharging ETA targets empty. Paused/full batteries and unusable rates show no ETA. ++
 				Device batteries are excluded; without a system battery the widget is hidden. ++
+		*clock*++
+			type: object ++
+			css class: widget-clock ++
+			properties: ++
+				time-format: ++
+					type: string ++
+					optional: true ++
+					default: "%H:%M" ++
+					description: GLib DateTime format for local time (for example, "%I:%M:%S %p" for 12-hour time with seconds) ++
+				date-format: ++
+					type: string ++
+					optional: true ++
+					default: "%a, %b %-d" ++
+					description: GLib DateTime format for weekday and date ++
+			description: Local time and weekday/date, refreshed while the control center is open. ++
+		*information*++
+			type: object ++
+			css class: widget-information ++
+			properties: ++
+				none ++
+			description: One frame with the local clock, System, Connections and Battery sections. ++
+				Uses existing clock, system-stats, gpu, network, bluetooth and battery configuration keys. ++
+				Empty Connections and Battery sections hide; use the information CSS variables to theme its frame and meters. ++
 #START pulse-audio
 		*volume*++
 			type: object ++
@@ -840,11 +872,16 @@ config file to be able to detect config errors
 	"widget-config": {
 		"title": {
 			"text": "Notifications",
+			"show-dnd": true,
 			"clear-all-button": true,
 			"button-text": "Clear All"
 		},
 		"dnd": {
 			"text": "Do Not Disturb"
+		},
+		"clock": {
+			"time-format": "%H:%M",
+			"date-format": "%a, %b %-d"
 		},
 		"label": {
 			"max-lines": 5,

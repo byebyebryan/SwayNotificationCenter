@@ -16,7 +16,7 @@ import tempfile
 import time
 
 
-def run(binary, client_test, dashboard_screenshot=None):
+def run(binary, client_test, dashboard_screenshot=None, information=False, stylesheet=None):
     import gi
     gi.require_version("Gio", "2.0")
     from gi.repository import Gio, GLib
@@ -80,7 +80,7 @@ def run(binary, client_test, dashboard_screenshot=None):
                                       "timeout": 1, "timeout-low": 1, "transition-time": 0,
                                       "notification-grouping": True}))
         style = root / "style.css"
-        style.write_text("* {}\n")
+        style.write_text(Path(stylesheet).read_text() if stylesheet else "* {}\n")
         read_fd, write_fd = os.pipe()
         xvfb = subprocess.Popen(["Xvfb", "-displayfd", str(write_fd), "-screen", "0", "800x600x24", "-nolisten", "tcp"],
                                 pass_fds=(write_fd,), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -110,7 +110,7 @@ def run(binary, client_test, dashboard_screenshot=None):
             env.pop("WAYLAND_DISPLAY", None)
             env.pop("NIRI_SOCKET", None)
             niri_config = root / "niri.kdl"
-            niri_config.write_text("")
+            niri_config.write_text("hotkey-overlay { skip-at-startup; }")
             compositor_log = (root / "niri.log").open("w+")
             compositor = subprocess.Popen(["niri", "-c", str(niri_config)], env=env,
                                           stdout=compositor_log, stderr=subprocess.STDOUT)
@@ -126,6 +126,20 @@ def run(binary, client_test, dashboard_screenshot=None):
             ipc_sockets = list(runtime.glob("niri*.sock"))
             assert len(ipc_sockets) == 1
             env["NIRI_SOCKET"] = str(ipc_sockets[0])
+
+            def capture_panel(path):
+                # The IPC action returns before its PNG is saved. Keep the
+                # fixture state stable until that capture has completed.
+                path = Path(path).resolve()
+                path.unlink(missing_ok=True)
+                pump(0.25)
+                subprocess.run(["niri", "msg", "action", "screenshot-screen", "--path", str(path)],
+                               env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                deadline = time.monotonic() + 3
+                while not path.exists():
+                    assert time.monotonic() < deadline, "private panel screenshot was not saved"
+                    pump(0.05)
+
             with (root / "server.log").open("w+") as log:
                 def start():
                     packaged_style = Path(binary).resolve().parents[1] / "data/style/style.css"
@@ -157,7 +171,8 @@ def run(binary, client_test, dashboard_screenshot=None):
 
                 def sample_counts():
                     text = (root / "server.log").read_text()
-                    return (text.count("system-stats sample:"), text.count("battery snapshot:"))
+                    return (text.count("system-stats sample:") + text.count("system information sample:"),
+                            text.count("battery snapshot:"))
 
                 def widgets_ready():
                     deadline = time.monotonic() + 3
@@ -266,10 +281,11 @@ def run(binary, client_test, dashboard_screenshot=None):
 
                 def network_sample():
                     return [line for line in (root / "server.log").read_text().splitlines()
-                            if "network sample:" in line][-1]
+                            if "network sample:" in line or "network information sample:" in line][-1]
 
                 def gpu_samples():
-                    return (root / "server.log").read_text().count("gpu snapshot:")
+                    text = (root / "server.log").read_text()
+                    return text.count("gpu snapshot:") + text.count("gpu information snapshot:")
 
                 def bluetooth_visible():
                     lines = [line for line in (root / "server.log").read_text().splitlines()
@@ -278,8 +294,10 @@ def run(binary, client_test, dashboard_screenshot=None):
 
                 try:
                     pump(0.1)
-                    dashboard_config = dict(original_config, widgets=["dashboard", "notifications"],
+                    dashboard_config = dict(original_config,
+                                            widgets=["information", "title", "notifications"] if information else ["dashboard", "notifications"],
                                             **{"control-center-width": 448, "widget-config": {
+                                                "clock": {}, "title": {"show-dnd": True, "button-text": "Clear"},
                                                 "system-stats": {"interval": 1}, "battery": {"interval": 1},
                                                 "gpu": {"interval": 1}}})
                     config.write_text(json.dumps(dashboard_config))
@@ -292,9 +310,7 @@ def run(binary, client_test, dashboard_screenshot=None):
                     assert calls == {"nm": 1, "bt": 1}, calls
                     assert gpu_samples() >= before_gpu + 2, "nested GPU timer did not start"
                     if dashboard_screenshot:
-                        subprocess.run(["niri", "msg", "action", "screenshot-screen", "--path",
-                                        str(Path(dashboard_screenshot).resolve())], env=env, check=True,
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                        capture_panel(dashboard_screenshot)
                     before = calls.copy()
                     fake["nm"]["/ap"]["org.freedesktop.NetworkManager.AccessPoint"]["Strength"] = GLib.Variant("y", 55)
                     for _ in range(10):
@@ -306,21 +322,21 @@ def run(binary, client_test, dashboard_screenshot=None):
                     fake["nm"][manager_path][manager_iface]["PrimaryConnection"] = GLib.Variant("o", "/ethernet_connection")
                     network_change(manager_path, manager_iface)
                     pump(0.4)
-                    assert "network sample: ETH 192.0.2.10" in network_sample(), "active Wi-Fi overrode primary Ethernet"
+                    ethernet_prefix = "network information sample: ETH Ethernet · " if information else "network sample: ETH "
+                    assert ethernet_prefix + "192.0.2.10" in network_sample(), "active Wi-Fi overrode primary Ethernet"
                     if dashboard_screenshot:
                         path = Path(dashboard_screenshot).resolve()
-                        subprocess.run(["niri", "msg", "action", "screenshot-screen", "--path",
-                                        str(path.with_stem(path.stem + "-ethernet"))], env=env, check=True,
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                        capture_panel(path.with_stem(path.stem + "-ethernet"))
                     fake["nm"]["/ethernet_ip"]["org.freedesktop.NetworkManager.IP4Config"]["AddressData"] = GLib.Variant(
                         "aa{sv}", [{"address": GLib.Variant("s", "192.0.2.11")}])
                     network_change("/ethernet_ip", "org.freedesktop.NetworkManager.IP4Config")
                     pump(0.4)
-                    assert "network sample: ETH 192.0.2.11" in network_sample(), "IP change was not observed"
+                    assert ethernet_prefix + "192.0.2.11" in network_sample(), "IP change was not observed"
                     fake["nm"][manager_path][manager_iface]["PrimaryConnection"] = GLib.Variant("o", "/wifi_connection")
                     network_change(manager_path, manager_iface)
                     pump(0.4)
-                    assert "network sample: WIFI A very long wireless network name" in network_sample(), "Wi-Fi did not return"
+                    wifi_prefix = "network information sample: WIFI " if information else "network sample: WIFI "
+                    assert wifi_prefix + "A very long wireless network name" in network_sample(), "Wi-Fi did not return"
                     del fake["bt"]["/device3"]
                     bus.emit_signal(None, "/", "org.freedesktop.DBus.ObjectManager", "InterfacesRemoved",
                                     GLib.Variant("(oas)", ("/device3", ["org.bluez.Device1", "org.bluez.Battery1"])))
@@ -369,7 +385,7 @@ def run(binary, client_test, dashboard_screenshot=None):
                     wifi_change(); pump(1.2)
                     assert calls == before and gpu_samples() == before_gpu, "removed dashboard retained work"
                     call("SetVisibility", "(b)", (False,))
-                    print(json.dumps({"result": "passed", "proof": "stacked dashboard lifecycle",
+                    print(json.dumps({"result": "passed", "proof": "information composite lifecycle" if information else "stacked dashboard lifecycle",
                                       "checks": ["nested refresh", "coalesced Wi-Fi signals", "Bluetooth removal",
                                                  "primary Ethernet/Wi-Fi handover and IP change",
                                                  "empty Bluetooth hiding and reconnection",
@@ -589,6 +605,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True)
     parser.add_argument("--dashboard-screenshot")
+    parser.add_argument("--information", action="store_true", help="exercise the unified information layout")
+    parser.add_argument("--stylesheet", help="optional private fixture stylesheet")
     parser.add_argument("--client-test", nargs=argparse.REMAINDER, default=[])
     args = parser.parse_args()
     if os.environ.get("SWAYNC_PRIVATE_ACTION_TEST") != "1":
@@ -603,7 +621,11 @@ if __name__ == "__main__":
                        __file__, "--binary", str(Path(args.binary).resolve())]
             if args.dashboard_screenshot:
                 command += ["--dashboard-screenshot", str(Path(args.dashboard_screenshot).resolve())]
+            if args.information:
+                command += ["--information"]
+            if args.stylesheet:
+                command += ["--stylesheet", str(Path(args.stylesheet).resolve())]
             if args.client_test:
                 command += ["--client-test", *args.client_test]
             raise SystemExit(subprocess.call(command, env=env))
-    run(args.binary, args.client_test, args.dashboard_screenshot)
+    run(args.binary, args.client_test, args.dashboard_screenshot, args.information, args.stylesheet)

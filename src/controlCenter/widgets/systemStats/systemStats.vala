@@ -6,19 +6,43 @@ namespace SwayNotificationCenter.Widgets {
 
         SystemData.Reader reader = new SystemData.Reader ();
         SystemData.CpuTimes ?previous = null;
-        Gtk.Label cpu_value;
-        Gtk.Label memory_value;
+        Gtk.Label ?cpu_value = null;
+        Gtk.Label ?memory_value = null;
+        InformationMeter ?cpu_meter = null;
+        InformationMeter ?memory_meter = null;
         bool compact;
+        bool information;
         GpuStats ?gpu;
 
-        public SystemStats (string suffix, bool compact = false) {
+        public SystemStats (string suffix, bool compact = false, bool information = false) {
             base (suffix);
+            initialize (suffix, compact, information);
+        }
+
+        void initialize (string suffix, bool compact, bool information) {
             this.compact = compact;
-            if (compact) {
+            this.information = information;
+            if (compact && !information) {
                 add_heading ("System");
             }
             configure_interval (1);
-            if (compact) {
+            if (information) {
+                orientation = Gtk.Orientation.VERTICAL;
+                spacing = 8;
+                var columns = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
+                columns.homogeneous = true;
+                columns.hexpand = true;
+                cpu_meter = new InformationMeter ("CPU");
+                memory_meter = new InformationMeter ("RAM");
+                cpu_meter.hexpand = memory_meter.hexpand = true;
+                columns.append (cpu_meter);
+                columns.append (memory_meter);
+                append (columns);
+                gpu = new GpuStats (suffix, true);
+                gpu.hexpand = true;
+                gpu.valign = Gtk.Align.START;
+                append (gpu);
+            } else if (compact) {
                 var columns = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 20);
                 columns.homogeneous = true;
                 columns.hexpand = true;
@@ -46,11 +70,26 @@ namespace SwayNotificationCenter.Widgets {
             }
         }
 
+        protected void replace_gpu_widget (GpuStats replacement) {
+            if (gpu != null) {
+                remove (gpu);
+            }
+            gpu = replacement;
+            gpu.hexpand = true;
+            gpu.valign = Gtk.Align.START;
+            append (gpu);
+        }
+
         protected override void reset_sample () {
             previous = null;
-            cpu_value.label = "—";
-            memory_value.label = "—";
-            memory_value.tooltip_text = null;
+            if (information) {
+                cpu_meter.set_reading (-1, "");
+                memory_meter.set_reading (-1, "");
+            } else {
+                cpu_value.label = "—";
+                memory_value.label = "—";
+                memory_value.tooltip_text = null;
+            }
         }
 
         protected override async void update_sample (Cancellable cancellable) {
@@ -59,11 +98,29 @@ namespace SwayNotificationCenter.Widgets {
             if (cancellable.is_cancelled ()) {
                 return;
             }
+            apply_system_sample (sample);
+        }
+
+        internal void apply_system_sample (SystemData.SystemSample sample) {
             double usage = sample.cpu != null ?sample.cpu.usage_since (previous) : -1;
 
             previous = sample.cpu;
             string frequency = sample.frequency_ghz > 0
                 ? "%.1f GHz".printf (sample.frequency_ghz) : "—";
+            if (information) {
+                cpu_meter.set_reading (usage, frequency);
+                bool valid_memory = sample.memory_total_gib > 0 && sample.memory_used_gib >= 0
+                    && sample.memory_used_gib <= sample.memory_total_gib;
+                double memory_percentage = valid_memory
+                    ? 100 * sample.memory_used_gib / sample.memory_total_gib : -1;
+                string memory = valid_memory
+                    ? "%.1f / %.0f GiB".printf (sample.memory_used_gib,
+                                                sample.memory_total_gib) : "";
+                memory_meter.set_reading (memory_percentage, memory);
+                debug ("system information sample: CPU %s; RAM %s",
+                       cpu_meter.get_reading_text (), memory_meter.get_reading_text ());
+                return;
+            }
             string utilization = SystemData.percentage (usage);
             cpu_value.label = "%s · %s".printf (frequency, utilization);
             if (sample.memory_total_gib > 0) {

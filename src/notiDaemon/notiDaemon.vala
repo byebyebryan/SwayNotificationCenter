@@ -183,7 +183,8 @@ namespace SwayNotificationCenter {
             if (activation_token != null && activation_token.length > 4096) {
                 return "unavailable";
             }
-            return notification.invoke_action (action_key, activation_token) ? "dispatched" : "unavailable";
+            bool invoked = notification.invoke_action (action_key, activation_token);
+            return invoked ? "dispatched" : "unavailable";
         }
 
         internal bool send_action (NotifyParams param, string action_key, string ?token) {
