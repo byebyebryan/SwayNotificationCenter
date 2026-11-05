@@ -13,6 +13,7 @@ import select
 import subprocess
 import sys
 import tempfile
+from native_fixtures import prepare_schema
 import time
 
 
@@ -96,7 +97,8 @@ def run(binary, client_test, dashboard_screenshot=None, information=False, style
             env = {**os.environ, "DISPLAY": ":" + display, "GSK_RENDERER": "cairo", "LIBGL_ALWAYS_SOFTWARE": "1",
                    "GTK_A11Y": "none", "XDG_CONFIG_HOME": str(root / "config"),
                    "XDG_CACHE_HOME": str(root / "cache"), "XDG_STATE_HOME": str(root / "state"),
-                   "XDG_RUNTIME_DIR": str(runtime), "GIO_USE_VFS": "local", "GSETTINGS_BACKEND": "memory"}
+                   "XDG_RUNTIME_DIR": str(runtime), "GIO_USE_VFS": "local", "GSETTINGS_BACKEND": "memory",
+                   "GSETTINGS_SCHEMA_DIR": prepare_schema(root)}
             # Private ObjectManagers stand in for the system bus. GPU fixture tests
             # exercise the real query guard; this GUI test never invokes NVIDIA.
             env["DBUS_SYSTEM_BUS_ADDRESS"] = os.environ["DBUS_SESSION_BUS_ADDRESS"]

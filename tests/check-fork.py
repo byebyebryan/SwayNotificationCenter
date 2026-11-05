@@ -21,7 +21,8 @@ def main():
     build = args.build_dir.resolve()
     artifacts = (args.artifacts.resolve() if args.artifacts else
                  build / "fork-check-artifacts")
-    required = ["meson", "ninja", "dbus-run-session", "xvfb-run", "Xvfb", "xauth"]
+    required = ["meson", "ninja", "glib-compile-schemas", "dbus-run-session",
+                "xvfb-run", "Xvfb", "xauth"]
     if args.compositor:
         required += ["niri", "kitty"]
     missing = [tool for tool in required if shutil.which(tool) is None]

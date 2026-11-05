@@ -68,6 +68,14 @@ versions and uploads native captures and build/test logs. Existing upstream
 build and lint workflows remain independent; the new workflow checks source,
 tests and workflow changes without adding dependencies to the runtime package.
 
+Both native runners compile their own settings schema inside the temporary
+fixture directory; a globally installed notifier or a previously used build is
+not a prerequisite. As of November 5, 2026, the inherited Fedora job is blocked
+before compilation by missing `pkgconfig(granite-7)` in its configured
+repositories. Arch is the qualified package/deployment path; Ubuntu's separate
+source build is additional compilation coverage. Keep other platform failures
+visible rather than treating them as a pass for an Arch release.
+
 ## An upstream update
 
 1. Create a dedicated integration branch or worktree from the current fork.

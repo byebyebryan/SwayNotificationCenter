@@ -7,6 +7,8 @@ import signal
 import subprocess
 import tempfile
 
+from native_fixtures import prepare_schema
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--binary", required=True)
 parser.add_argument("--stylesheet",
@@ -30,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix="swaync-widget-tests-") as directory:
     env = {**os.environ, "SWAYNC_PRIVATE_WIDGET_TEST": "1", "GDK_BACKEND": "x11",
            "GSK_RENDERER": "cairo", "LIBGL_ALWAYS_SOFTWARE": "1", "GTK_A11Y": "test",
            "GIO_USE_VFS": "local", "GSETTINGS_BACKEND": "memory", "LC_ALL": "C.UTF-8",
-           "GSETTINGS_SCHEMA_DIR": str(binary.parent / "data"),
+           "GSETTINGS_SCHEMA_DIR": prepare_schema(root),
            "XDG_CONFIG_HOME": str(root / "config"), "XDG_STATE_HOME": str(root / "state"),
            "XDG_CACHE_HOME": str(root / "cache"), "XDG_RUNTIME_DIR": str(runtime),
            "DBUS_SYSTEM_BUS_ADDRESS": "unix:path=" + str(root / "no-system-bus"),
