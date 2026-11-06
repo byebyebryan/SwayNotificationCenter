@@ -4,11 +4,11 @@ name: Build source on Ubuntu 26.04 LTS
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
+  # Triggers the workflow on push or pull request events for main and niri-plus
   push:
-    branches: [ main ]
+    branches: [ main, niri-plus ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, niri-plus ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:

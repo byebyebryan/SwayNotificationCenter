@@ -7,11 +7,14 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
+import fork_ci
 from fork_ci import (
     ContractError, full_commit, package_metadata, pinned_source,
     recipe_metadata, required_jobs, successful_checks,
@@ -171,8 +174,37 @@ class RequiredGateTests(unittest.TestCase):
 
     def test_protection_and_release_policy_select_the_same_recipe_checks(self):
         policy = json.loads(Path(__file__).with_name("ci-policy.json").read_text())
+        self.assertEqual(policy["maintained_branch"], "niri-plus")
         self.assertEqual(policy["required_recipe_checks"],
                          policy["branch_protection"]["required_status_checks"]["contexts"])
+
+    def test_fork_workflows_cover_main_and_niri_plus_pushes_and_pull_requests(self):
+        root = Path(__file__).resolve().parent.parent
+        for workflow_name in ("fork-checks", "ubuntu-build", "linting", "fedora-build"):
+            text = (root / ".github/workflows" / f"{workflow_name}.yml").read_text()
+            for event in ("push", "pull_request"):
+                match = re.search(
+                    rf"(?ms)^  {event}:\n(.*?)(?=^  [A-Za-z0-9_-]+:|\Z)", text
+                )
+                self.assertIsNotNone(match, f"{workflow_name} lacks a {event} trigger")
+                branches = re.search(r"branches:\s*\[([^\]]*)\]", match.group(1))
+                self.assertIsNotNone(branches, f"{workflow_name} {event} has no inline branches")
+                self.assertEqual(
+                    {name.strip() for name in branches.group(1).split(",")},
+                    {"main", "niri-plus"},
+                )
+
+    def test_fedora_source_build_remains_opt_in_for_the_fork(self):
+        root = Path(__file__).resolve().parent.parent
+        text = (root / ".github/workflows/fedora-build.yml").read_text()
+        self.assertIn("github.repository == 'ErikReider/SwayNotificationCenter'", text)
+        self.assertIn("github.repository == 'byebyebryan/SwayNotificationCenter'", text)
+        self.assertIn("vars.SWAYNC_ENABLE_FEDORA_CHECKS == 'true'", text)
+        for workflow_name in ("fedora-copr", "PKGBUILD-build"):
+            publisher = (root / ".github/workflows" / f"{workflow_name}.yml").read_text()
+            self.assertIn(
+                "if: github.repository == 'ErikReider/SwayNotificationCenter'", publisher
+            )
 
     def test_release_entrypoint_rejects_a_moving_ref_without_querying_github(self):
         run = subprocess.run([sys.executable, str(Path(__file__).with_name("check-release.py")),
@@ -182,7 +214,7 @@ class RequiredGateTests(unittest.TestCase):
 
 
 class ReleaseEntrypointTests(unittest.TestCase):
-    def invoke(self, source_success=True, recipe_failure=False):
+    def invoke(self, source_success=True, recipe_failure=False, provenance="source-ancestor"):
         path = Path(__file__).with_name("check-release.py")
         spec = importlib.util.spec_from_file_location("release_check", path)
         module = importlib.util.module_from_spec(spec)
@@ -190,8 +222,6 @@ class ReleaseEntrypointTests(unittest.TestCase):
         policy = json.loads(path.with_name("ci-policy.json").read_text())
 
         def fixture_command(command):
-            if command[0] == "git":
-                return RECIPE_TEXT if "show" in command else ""
             if command[0] != "gh":
                 raise AssertionError(command)
             if f"/commits/{RECIPE}/" in command[2]:
@@ -205,8 +235,20 @@ class ReleaseEntrypointTests(unittest.TestCase):
                 values = [check()] if source_success else []
             return json.dumps([{"check_runs": values}])
 
+        def fixture_git_bytes(command):
+            self.assertEqual(command[0], "git")
+            return RECIPE_TEXT.encode("utf-8")
+
+        def fixture_provenance(root, repository, recipe_commit, source_commit, recipe):
+            self.assertEqual(recipe_commit, RECIPE)
+            self.assertEqual(source_commit, SOURCE)
+            self.assertEqual(recipe, RECIPE_TEXT.encode("utf-8"))
+            return provenance
+
         output = io.StringIO()
         with patch.object(module, "run", fixture_command), \
+                patch.object(module, "run_bytes", fixture_git_bytes), \
+                patch.object(module, "release_source_provenance", fixture_provenance), \
                 patch.object(sys, "argv", [str(path), "--recipe-commit", RECIPE]), \
                 contextlib.redirect_stdout(output):
             status = module.main()
@@ -217,19 +259,208 @@ class ReleaseEntrypointTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(result["source_commit"], SOURCE)
         self.assertEqual(result["recipe_commit"], RECIPE)
+        self.assertEqual(result["source_provenance"], "source-ancestor")
         self.assertEqual(result["status"], "ready")
         self.assertFalse(result["release_published"])
 
-    def test_green_recipe_cannot_replace_missing_source_evidence(self):
-        status, result = self.invoke(source_success=False)
+    def test_legacy_fallback_cannot_replace_missing_source_evidence(self):
+        status, result = self.invoke(source_success=False, provenance="historical-release-17")
         self.assertEqual(status, 1)
         self.assertEqual(result["status"], "not-ready")
         self.assertIn("native: missing", result["reason"])
 
-    def test_new_recipe_failure_rejects_an_older_success(self):
-        status, result = self.invoke(recipe_failure=True)
+    def test_legacy_fallback_still_rejects_a_newer_recipe_check_failure(self):
+        status, result = self.invoke(
+            recipe_failure=True, provenance="historical-release-17"
+        )
         self.assertEqual(status, 1)
         self.assertIn("Fork required checks", result["reason"])
+
+
+class TemporaryReleaseHistory:
+    """Real Git refs for exercising source and recipe ancestry decisions."""
+
+    def __init__(self, root):
+        self.root = root
+        self.git("init", "--quiet", "--initial-branch=historical")
+        self.git("config", "user.name", "Fork CI Test")
+        self.git("config", "user.email", "fork-ci-test@example.invalid")
+
+        (root / "source.txt").write_text("historical source\n")
+        self.git("add", "source.txt")
+        self.git("commit", "--quiet", "-m", "historical source")
+        self.source_commit = self.git("rev-parse", "HEAD")
+
+        self.legacy_recipe = self.recipe(self.source_commit, CHECKSUM)
+        self.write_recipe(self.legacy_recipe)
+        self.git("add", "packaging/arch/PKGBUILD")
+        self.git("commit", "--quiet", "-m", "historical release recipe")
+        self.legacy_recipe_commit = self.git("rev-parse", "HEAD")
+        self.git("branch", "preserved-main", self.legacy_recipe_commit)
+
+        empty_tree = self.git("mktree", input_bytes=b"")
+        migration_root = self.git("commit-tree", empty_tree, "-m", "consolidation root")
+        self.git("checkout", "--quiet", "--force", "-B", "migrated-candidate", migration_root)
+        self.write_recipe(self.legacy_recipe)
+        self.git("add", "packaging/arch/PKGBUILD")
+        self.git("commit", "--quiet", "-m", "consolidated preview")
+        self.migration_base = self.git("rev-parse", "HEAD")
+        (root / "preview-marker").write_text("candidate descendant\n")
+        self.git("add", "preview-marker")
+        self.git("commit", "--quiet", "-m", "release recipe on migrated lineage")
+        self.migrated_recipe_commit = self.git("rev-parse", "HEAD")
+        self.migrated_recipe = (root / "packaging/arch/PKGBUILD").read_bytes()
+
+        self.unrelated_base = self.git("commit-tree", empty_tree, "-m", "unrelated candidate root")
+        self.git("checkout", "--quiet", "--force", "-B", "unrelated-candidate", self.unrelated_base)
+        self.write_recipe(self.legacy_recipe)
+        self.git("add", "packaging/arch/PKGBUILD")
+        self.git("commit", "--quiet", "-m", "copied historical recipe elsewhere")
+        self.unrelated_recipe_commit = self.git("rev-parse", "HEAD")
+
+        self.unrelated_source_commit = self.git("commit-tree", empty_tree, "-m", "unrelated source")
+
+        self.git("checkout", "--quiet", "--force", "-B", "normal-candidate", self.source_commit)
+        self.write_recipe(self.recipe(self.source_commit, "d" * 64))
+        self.git("add", "packaging/arch/PKGBUILD")
+        self.git("commit", "--quiet", "-m", "normal recipe descendant")
+        self.normal_recipe_commit = self.git("rev-parse", "HEAD")
+        self.normal_recipe = (root / "packaging/arch/PKGBUILD").read_bytes()
+
+    def git(self, *arguments, input_bytes=None):
+        result = subprocess.run(
+            ["git", "-C", str(self.root), *arguments], input=input_bytes,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        if result.returncode:
+            raise AssertionError(result.stderr.decode("utf-8", errors="replace"))
+        return result.stdout.decode("utf-8").strip()
+
+    @staticmethod
+    def recipe(source, checksum):
+        return (
+            "pkgname=swaync-bryan\n"
+            "pkgver=0.12.6\n"
+            "pkgrel=17\n"
+            f"_commit={source}\n"
+            f"sha256sums=('{checksum}')\n"
+        ).encode("utf-8")
+
+    def write_recipe(self, content):
+        path = self.root / "packaging/arch/PKGBUILD"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+
+    def patched_constants(self, **overrides):
+        values = {
+            "HISTORICAL_RELEASE_17_RECIPE_COMMIT": self.legacy_recipe_commit,
+            "HISTORICAL_RELEASE_17_SOURCE_COMMIT": self.source_commit,
+            "HISTORICAL_RELEASE_17_SOURCE_SHA256": CHECKSUM,
+            "HISTORICAL_RELEASE_17_MIGRATION_BASE": self.migration_base,
+        }
+        values.update(overrides)
+        return patch.multiple(fork_ci, **values)
+
+
+class ReleaseProvenanceHistoryTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="fork-ci-history-")
+        self.history = TemporaryReleaseHistory(Path(self.temporary.name))
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def test_normal_source_ancestry_is_unchanged(self):
+        with self.history.patched_constants():
+            result = fork_ci.release_source_provenance(
+                self.history.root, "unrelated/repository", self.history.normal_recipe_commit,
+                self.history.source_commit, self.history.normal_recipe,
+            )
+        self.assertEqual(result, "source-ancestor")
+
+    def test_exact_release_17_fallback_accepts_the_migrated_lineage(self):
+        with self.history.patched_constants():
+            result = fork_ci.release_source_provenance(
+                self.history.root, fork_ci.HISTORICAL_RELEASE_17_REPOSITORY,
+                self.history.migrated_recipe_commit, self.history.source_commit,
+                self.history.migrated_recipe,
+            )
+        self.assertEqual(result, "historical-release-17")
+
+    def test_fallback_requires_a_later_commit_after_the_migration_base(self):
+        with self.history.patched_constants():
+            with self.assertRaises(ContractError):
+                fork_ci.release_source_provenance(
+                    self.history.root, fork_ci.HISTORICAL_RELEASE_17_REPOSITORY,
+                    self.history.migration_base, self.history.source_commit,
+                    self.history.legacy_recipe,
+                )
+
+    def test_matching_historical_blob_is_rejected_without_historical_source_ancestry(self):
+        with self.history.patched_constants(
+            HISTORICAL_RELEASE_17_RECIPE_COMMIT=self.history.migrated_recipe_commit
+        ):
+            with self.assertRaises(ContractError):
+                fork_ci.release_source_provenance(
+                    self.history.root, fork_ci.HISTORICAL_RELEASE_17_REPOSITORY,
+                    self.history.migrated_recipe_commit, self.history.source_commit,
+                    self.history.migrated_recipe,
+                )
+
+    def test_legacy_fallback_rejects_foreign_repository(self):
+        with self.history.patched_constants():
+            with self.assertRaises(ContractError):
+                fork_ci.release_source_provenance(
+                    self.history.root, "somewhere/else", self.history.migrated_recipe_commit,
+                    self.history.source_commit, self.history.migrated_recipe,
+                )
+
+    def test_legacy_fallback_rejects_candidate_outside_migrated_lineage(self):
+        with self.history.patched_constants():
+            with self.assertRaises(ContractError):
+                fork_ci.release_source_provenance(
+                    self.history.root, fork_ci.HISTORICAL_RELEASE_17_REPOSITORY,
+                    self.history.unrelated_recipe_commit, self.history.source_commit,
+                    self.history.legacy_recipe,
+                )
+
+    def test_legacy_fallback_rejects_changed_recipe_source_or_checksum(self):
+        changed_comment = self.history.legacy_recipe + b"# altered recipe\n"
+        changed_checksum = self.history.legacy_recipe.replace(CHECKSUM.encode(), b"d" * 64)
+        changed_source = self.history.legacy_recipe.replace(
+            self.history.source_commit.encode(), self.history.unrelated_source_commit.encode()
+        )
+        cases = (
+            (self.history.source_commit, changed_comment),
+            (self.history.source_commit, changed_checksum),
+            (self.history.unrelated_source_commit, changed_source),
+        )
+        with self.history.patched_constants():
+            for source, recipe in cases:
+                with self.subTest(source=source, recipe=recipe[-24:]), self.assertRaises(ContractError):
+                    fork_ci.release_source_provenance(
+                        self.history.root, fork_ci.HISTORICAL_RELEASE_17_REPOSITORY,
+                        self.history.migrated_recipe_commit, source, recipe,
+                    )
+
+    def test_legacy_fallback_rejects_unrecognized_checksum_anchor(self):
+        with self.history.patched_constants(HISTORICAL_RELEASE_17_SOURCE_SHA256="d" * 64):
+            with self.assertRaises(ContractError):
+                fork_ci.release_source_provenance(
+                    self.history.root, fork_ci.HISTORICAL_RELEASE_17_REPOSITORY,
+                    self.history.migrated_recipe_commit, self.history.source_commit,
+                    self.history.migrated_recipe,
+                )
+
+    def test_legacy_fallback_fails_when_historical_recipe_object_is_unavailable(self):
+        missing_commit = "f" * 40
+        with self.history.patched_constants(HISTORICAL_RELEASE_17_RECIPE_COMMIT=missing_commit):
+            with self.assertRaises(ContractError):
+                fork_ci.release_source_provenance(
+                    self.history.root, fork_ci.HISTORICAL_RELEASE_17_REPOSITORY,
+                    self.history.migrated_recipe_commit, self.history.source_commit,
+                    self.history.migrated_recipe,
+                )
 
 
 if __name__ == "__main__":

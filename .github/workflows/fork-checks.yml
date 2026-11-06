@@ -2,9 +2,9 @@ name: Fork checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, niri-plus]
   pull_request:
-    branches: [main]
+    branches: [main, niri-plus]
   workflow_dispatch:
 
 permissions:

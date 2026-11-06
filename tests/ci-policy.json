@@ -1,5 +1,5 @@
 {
-  "maintained_branch": "main",
+  "maintained_branch": "niri-plus",
   "required_recipe_checks": [
     "Fork required checks",
     "ubuntu-build",

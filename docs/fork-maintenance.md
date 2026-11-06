@@ -23,16 +23,79 @@ rtk proxy git log --oneline HEAD..upstream/main
 rtk proxy git diff --stat b8017a4d1a53debdf0e8766628fb80357eae31e7..HEAD
 ```
 
-The fork's `main` is its maintained downstream branch; `upstream/main` is the
-upstream refresh source. Base ongoing work on the current fork `main` in a
-feature branch or worktree, then consolidate and review the branch before a
-release. Preserve published commits and integrate changes forward without
-rewriting published history. Keep a source or test change separate from the
-commit that updates the canonical package recipe.
-
 Update the recorded baseline when an upstream integration is accepted. Keep
 feature commits separate from package-recipe and consumer-selection commits.
 Avoid rewriting published history or reformatting unrelated upstream files.
+
+## Branches and development history
+
+The selected maintained branch is `niri-plus`, named for the desktop project
+this fork supports. The currently published default and maintained branch is
+still `main`. Continue using `main` until the
+[migration plan](niri-plus-migration-plan.md) records a verified cutover; the
+branch name in that plan is a target, not an already completed migration.
+
+After the cutover, branch roles are:
+
+| Branch | Role |
+| --- | --- |
+| `origin/niri-plus` | Maintained downstream branch and GitHub default; reviewed changes advance it without rewriting its published history |
+| `origin/main` | Preserved historical downstream line; keep its published tip and release history intact |
+| `upstream/main` | Upstream refresh source, fetched through the separate `upstream` remote |
+| `feature/<change>` | Incremental development and review for one change or development cycle |
+| `release/<package-update>` | Separate canonical package-recipe update after the source commit is qualified |
+
+### Incremental development and consolidation
+
+1. Start a feature branch or worktree from the current maintained tip. Commit
+   and push drafts, fixes and review changes as needed. Shared development
+   branches can stay append-only; routine consolidation needs no force push.
+2. Keep all work intended to become one source commit on that branch until it
+   is ready. A whole development cycle can become one source commit if none of
+   its pieces have already landed separately on the maintained branch. When a
+   cycle needs several review PRs, target its development branch and reserve
+   one final PR for integration into the maintained branch.
+3. Review the complete diff and run the appropriate checks. If the maintained
+   branch advances, merge it into the development branch, resolve conflicts
+   and rerun affected checks. Keep the PR current with required protection.
+4. Use **Squash and merge** for the final downstream feature PR. Give the new
+   commit a title and description that explain the complete resulting change.
+   The maintained branch gains one new commit; neither branch's existing
+   commits need to be rewritten. Preserve any development refs needed for
+   recovery or provenance.
+5. Wait for hosted checks on the exact resulting maintained source commit
+   before selecting it for a package. PR checks on a development or synthetic
+   merge SHA do not establish acceptance of that resulting source SHA.
+6. Start subsequent work on a fresh branch from the updated maintained tip.
+   Continuing a branch after its squash merge can repeat already integrated
+   commits in later PRs.
+
+For example, a feature can have many development commits while the maintained
+branch receives one source commit and one later package-recipe commit:
+
+```text
+feature/sidebar:  B -> c1 -> c2 -> c3
+maintained:      A -> B -> S -> P
+```
+
+`S` contains the combined feature changes. `P` pins the exact published `S`
+archive and checksum after its source checks succeed. These are separate
+commits because the recipe records the already existing source commit.
+Keep temporary preview builds separate from canonical release pins.
+
+The consolidation boundary is **integration into the maintained branch**.
+Once commits have landed there, combining them changes published ancestry.
+Fix those commits with later commits or reverts; do not postpone consolidation
+until after integration or rewrite the maintained branch before a release.
+One source commit per development cycle is an option, not a requirement to
+combine unrelated features or every change in a release.
+
+Upstream integrations use a dedicated merge PR that preserves upstream
+ancestry, as described below. Keep merge commits available for those updates;
+a blanket linear-history requirement would prevent that workflow.
+
+See GitHub's [pull request merge documentation](https://docs.github.com/en/pull-requests/reference/pull-request-merges#squash-and-merge-your-commits)
+for squash behavior and the caution about reusing a squashed development branch.
 
 ## Downstream patch map
 
@@ -58,9 +121,11 @@ compatibility and lifecycle evidence.
 
 ## Fork checks and platform compilation
 
-The [fork workflow](../.github/workflows/fork-checks.yml) runs on every push to
-`main`, pull request targeting `main`, and manual dispatch, without path
-filters. It has three checks and an aggregate named `Fork required checks`:
+The [fork workflow](../.github/workflows/fork-checks.yml) covers every push to
+`main` or `niri-plus`, pull requests targeting either branch, and manual
+dispatch, without path filters. This includes coverage for the selected
+maintained branch before the default changes. It has three checks and an
+aggregate named `Fork required checks`:
 
 - `native` runs the private source and widget checks below.
 - `arch-recipe` runs `tests/check-arch-recipe.py` in a clean Arch container as a
@@ -130,6 +195,16 @@ source commit pinned by the recipe, the required recipe checks, and the native
 check for that pinned source. It does not publish a release. A passing source
 check for the working tree cannot substitute for the pinned recipe and source
 checks.
+
+The verifier normally requires the pinned source to be an ancestor of the
+candidate recipe. The branch migration has one narrow compatibility path for
+the unchanged release-17 recipe: it must match the immutable historical recipe
+contents and source/checksum pin, its source must be an ancestor of that
+historical recipe, and the candidate must be a later descendant of the recorded
+consolidated preview head. Exact candidate recipe checks and independent exact-source native
+checks are still required. Changed or unrecognized legacy recipes fail; future
+source releases retain the normal ancestry requirement. The
+[migration plan](niri-plus-migration-plan.md) records the immutable anchors.
 The readiness query is read-only against GitHub and writes its requested local
 JSON report to the selected output path.
 
@@ -142,37 +217,48 @@ rtk proxy python3 tests/check-release.py --recipe-commit FULL_RECIPE_SHA \
 
 ## An upstream update
 
-1. Create a dedicated integration branch or worktree from the current fork.
-   Review the upstream range against the recorded baseline before integrating.
+1. Create a dedicated integration branch or worktree from the current
+   maintained tip. Review the upstream range against the recorded baseline,
+   then merge the selected upstream revision into that integration branch.
 2. Review upstream-owned hooks in activation, notification identity/actions,
    control-center routing, factory/schema and title. Resolve conflicts by
    preserving the documented behavior, rather than copying whole old files.
 3. Run the native entrypoint plus the existing formatter/lint and package
    checks. Review current native captures against the selected design.
-4. Record the accepted upstream commit, changed downstream patches and any
-   changed dependency requirements. Release through the pinned recipe path.
+4. Integrate through a dedicated PR using a merge commit so upstream ancestry
+   is retained. Do not squash upstream integrations or rebase the published
+   maintained branch. Record the accepted upstream commit, changed downstream
+   patches and any changed dependency requirements. Release through the pinned
+   recipe path.
 
 Do not combine an upstream upgrade with a desktop policy or visual redesign;
 keeping the changes separate makes regressions easier to identify and revert.
 
 ## A downstream release
 
-1. Consolidate and review source/tests/docs on a feature branch. Run the fork
-   checks for the candidate source revision. After publishing the branch, open
-   a pull request to `main` and verify its hosted required checks before
-   integrating the reviewed source. Confirm the exact source commit is
-   published on `main`, then calculate its canonical GitHub archive hash.
-2. Update `packaging/arch/PKGBUILD` with that full source commit and checksum.
+1. Develop and review source/tests/docs on a feature branch using the
+   [development history policy](#branches-and-development-history). Keep all
+   commits intended for one source change there until the final squash PR.
+   Verify the PR's hosted required checks before integration into the current
+   maintained branch (`main` until cutover, then `niri-plus`).
+2. Wait for hosted checks on the exact resulting maintained source SHA.
+   Confirm that immutable commit is published, then download, build and verify
+   its exact canonical GitHub archive and calculate its checksum. A green PR
+   head is not a substitute for this source commit's checks, and the recipe
+   must not pin a temporary development SHA.
+3. On a fresh package-update branch, update `packaging/arch/PKGBUILD` with that
+   full source commit and checksum.
    Bump `pkgrel` for a downstream update at the same upstream version, and
    keep the recipe update in a separate commit from the source change. Publish
    the recipe candidate for its checks.
-3. Run the manual read-only release-readiness check on the exact candidate.
+4. After integrating the package update, run the manual read-only
+   release-readiness check on the exact resulting recipe commit.
    Treat branch protection as part of release readiness only after confirming
    the repository actually requires the intended status contexts.
-4. Build the canonical recipe, publish the package, recipe and checksums, and
+5. Build the canonical recipe, publish the package, recipe and checksums, and
    verify anonymous downloads. Keep source, recipe, package and host receipts
    distinct; local builds can differ in archive metadata and compiler inputs.
-5. Update the managed consumer's source/recipe tuple, inspect scoped diffs and
+6. Update the managed consumer's source/recipe tuple, inspect scoped diffs and
    recovery artifacts, and apply only reviewed targets. Record offline hosts as
    pending. Retain the previous packages and configuration for rollback.
 

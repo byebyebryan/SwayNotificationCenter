@@ -14,13 +14,23 @@ from pathlib import Path
 import re
 import subprocess
 
-from fork_ci import ContractError, full_commit, pinned_source, successful_checks
+from fork_ci import (
+    ContractError, full_commit, pinned_source, release_source_provenance, successful_checks,
+)
 
 
 def run(command):
     result = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if result.returncode:
         raise ContractError(f"{command[0]} failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def run_bytes(command):
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.returncode:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ContractError(f"{command[0]} failed: {detail}")
     return result.stdout
 
 
@@ -45,11 +55,14 @@ def main():
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repo):
             raise ContractError("invalid repository name")
         root = Path(__file__).resolve().parent.parent
-        recipe = run(["git", "-C", str(root), "show", f"{commit}:packaging/arch/PKGBUILD"])
-        source = pinned_source(recipe)
+        recipe = run_bytes([
+            "git", "-C", str(root), "show", f"{commit}:packaging/arch/PKGBUILD"
+        ])
+        source = pinned_source(recipe.decode("utf-8"))
         receipt["source_commit"] = source
-        # Source changes precede their canonical archive/checksum recipe commit.
-        run(["git", "-C", str(root), "merge-base", "--is-ancestor", source, commit])
+        receipt["source_provenance"] = release_source_provenance(
+            root, args.repo, commit, source, recipe
+        )
         policy = json.loads((root / "tests/ci-policy.json").read_text())
         receipt["recipe_checks"] = successful_checks(
             check_runs(args.repo, commit), commit, policy["required_recipe_checks"])
