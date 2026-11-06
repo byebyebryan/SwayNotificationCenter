@@ -111,14 +111,18 @@ variable `SWAYNC_ENABLE_FEDORA_CHECKS` is exactly `true`, including manual
 dispatch. The Fedora COPR publisher runs only in the upstream repository and
 does not publish releases from this fork.
 
-The proposed branch-protection contexts are `Fork required checks`,
-`ubuntu-build`, `vala-linting`, `uncrustify`, and `rpmlint`. The proposed
-settings request body is the `branch_protection` member of
-`tests/ci-policy.json`; it has not been applied. Workflows do not configure
-repository settings: treat protection as
-enforced only after the settings are applied and verified in GitHub. Hosted
-check runs and release-readiness remain pending until the workflows and
-candidate commits are published and their checks have completed.
+The branch-protection policy selects `Fork required checks`, `ubuntu-build`,
+`vala-linting`, `uncrustify`, and `rpmlint`. Its settings request body is the
+`branch_protection` member of `tests/ci-policy.json`. Apply the policy separately
+after these contexts have been reported, and verify the live GitHub settings:
+
+```sh
+rtk proxy gh api repos/byebyebryan/SwayNotificationCenter/branches/main/protection
+```
+
+Workflows do not configure repository settings. A source policy or local test
+result does not establish that protection is active or hosted checks passed.
+Verify those boundaries for the exact published candidate commit before release.
 
 Before release, the manual `fork-release-check.yml` workflow runs
 `tests/check-release.py` as a read-only readiness check. It verifies the full
