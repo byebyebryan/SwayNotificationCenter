@@ -362,6 +362,33 @@ namespace SwayNotificationCenter.WidgetTests {
         drain ();
     }
 
+    void wait_for_layout (Gtk.Widget widget) {
+        var frame_clock = widget.get_frame_clock ();
+        assert_nonnull (frame_clock);
+        var loop = new MainLoop ();
+        bool painted = false;
+        bool timed_out = false;
+        ulong handler = frame_clock.after_paint.connect (() => {
+            painted = true;
+            loop.quit ();
+        });
+        uint deadline = Timeout.add (2000, () => {
+            timed_out = true;
+            loop.quit ();
+            return Source.REMOVE;
+        });
+        // A short timeout can expire before GTK allocates queued child changes.
+        // Measure only after the next layout/frame, retaining a bounded failure.
+        frame_clock.request_phase (Gdk.FrameClockPhase.LAYOUT | Gdk.FrameClockPhase.AFTER_PAINT);
+        loop.run ();
+        frame_clock.disconnect (handler);
+        if (!timed_out) {
+            Source.remove (deadline);
+        }
+        assert (painted && !timed_out);
+        drain ();
+    }
+
     Gtk.Label ? find_label_text (Gtk.Widget root, string text) {
         if (root is Gtk.Label && ((Gtk.Label) root).label == text) {
             return (Gtk.Label) root;
@@ -814,7 +841,7 @@ namespace SwayNotificationCenter.WidgetTests {
         assert_nonnull (vram_level);
         assert (vram_level.visible && vram_level.get_value () == 20);
         drain ();
-        wait_for_timeout (40);
+        wait_for_layout (window);
         Graphene.Rect cpu_bounds;
         Graphene.Rect ram_bounds;
         Graphene.Rect gpu_bounds;
@@ -848,7 +875,7 @@ namespace SwayNotificationCenter.WidgetTests {
         assert (ip.xalign == 1 && ip.single_line_mode);
         assert (ip.ellipsize == Pango.EllipsizeMode.END);
         assert (ip.tooltip_text == "192.0.2.10");
-        wait_for_timeout (80);
+        wait_for_layout (window);
         assert (ip.get_width () > 80 && !ip.get_layout ().is_ellipsized ());
         Graphene.Rect ip_bounds;
         Graphene.Rect cpu_information_bounds;
@@ -920,7 +947,7 @@ namespace SwayNotificationCenter.WidgetTests {
         assert (more.visible && more.label == "+1 more");
         more.clicked ();
         assert (more.label == "Show less");
-        wait_for_timeout (20);
+        wait_for_layout (window);
         Graphene.Rect device_grid_bounds;
         Graphene.Rect more_bounds;
         Gtk.Widget ?device_grid = find_widget (bluetooth, "information-device-grid");
@@ -964,7 +991,7 @@ namespace SwayNotificationCenter.WidgetTests {
         var resting = battery_sample ("BAT0", "Not charging", 80, 80);
         battery.seed ({ resting });
         assert (battery_state.label == "Idle at 80%");
-        wait_for_timeout (40);
+        wait_for_layout (window);
         assert (!battery_state.get_layout ().is_ellipsized ());
         assert (css_count (battery_meter, "information-limit-marker") == 1);
         Gtk.Widget ?rates = find_widget (battery, "information-battery-rates");
