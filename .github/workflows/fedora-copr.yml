@@ -1,4 +1,4 @@
-name: Package for Fedora Copr repo
+name: Publish upstream Fedora Copr package
 
 on:
   release:
@@ -9,8 +9,11 @@ on:
 
 jobs:
   fedora-copr:
+    if: github.repository == 'ErikReider/SwayNotificationCenter'
     container: registry.fedoraproject.org/fedora-minimal:latest
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Install API token for copr-cli
@@ -21,11 +24,13 @@ jobs:
         run: |
           mkdir -p "$HOME/.config"
           # To generate a new token: https://copr.fedorainfracloud.org/api/.
-          echo "[copr-cli]" >> "$HOME/.config/copr"
-          echo "login = $API_LOGIN" >> "$HOME/.config/copr"
-          echo "username = $API_USERNAME" >> "$HOME/.config/copr"
-          echo "token = $API_TOKEN_CONTENT" >> "$HOME/.config/copr"
-          echo "copr_url = https://copr.fedorainfracloud.org" >> "$HOME/.config/copr"
+          {
+            echo "[copr-cli]"
+            echo "login = $API_LOGIN"
+            echo "username = $API_USERNAME"
+            echo "token = $API_TOKEN_CONTENT"
+            echo "copr_url = https://copr.fedorainfracloud.org"
+          } >> "$HOME/.config/copr"
 
       - name: Install tooling for source RPM build
         run: |
@@ -34,9 +39,10 @@ jobs:
 
       # It is necessary to checkout into sub-directory, because of some weird ownership problems cause by using containers
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
           path: swaync
 
       - name: Copy spec into root dir
@@ -45,6 +51,8 @@ jobs:
           cp ./build-scripts/swaync.rpkg.spec ./
 
       - name: Submit the build to copr
+        env:
+          COPR_REPO_NAME: ${{ secrets.COPR_REPO_NAME }}
         run: |
           cd swaync
-          rpkg -v copr-build -w ${{ secrets.COPR_REPO_NAME }}
+          rpkg -v copr-build -w "$COPR_REPO_NAME"

@@ -43,7 +43,8 @@ jobs:
       - name: Run uncrustify
         run: |
           cd swaync
-          uncrustify -c ./.uncrustify.cfg -l vala $(find . -name "*.vala" -type f) --check >/dev/null
+          find . -name '*.vala' -type f -print0 |
+            xargs -0 -r uncrustify -c ./.uncrustify.cfg -l vala --check >/dev/null
 
   rpmlint:
     container: registry.fedoraproject.org/fedora-minimal:latest
