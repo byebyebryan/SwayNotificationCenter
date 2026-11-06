@@ -14,6 +14,7 @@ parser.add_argument("--binary", required=True)
 parser.add_argument("--stylesheet",
                     help="compiled GTK stylesheet (defaults to the binary's Meson build tree)")
 parser.add_argument("--screenshot", help="write the deterministic Information fixture PNG")
+parser.add_argument("--test-path", help="run one GLib test path, for focused native checks")
 args = parser.parse_args()
 binary = Path(args.binary).resolve()
 stylesheet = (Path(args.stylesheet).resolve() if args.stylesheet else
@@ -40,8 +41,11 @@ with tempfile.TemporaryDirectory(prefix="swaync-widget-tests-") as directory:
            "SWAYNC_PRIVATE_WIDGET_CSS": str(stylesheet)}
     if args.screenshot:
         env["SWAYNC_PRIVATE_WIDGET_SCREENSHOT"] = str(Path(args.screenshot).resolve())
-    process = subprocess.Popen(["dbus-run-session", "--config-file", str(bus), "--",
-                                "xvfb-run", "-a", str(binary)], env=env, start_new_session=True)
+    command = ["dbus-run-session", "--config-file", str(bus), "--",
+               "xvfb-run", "-a", str(binary)]
+    if args.test_path:
+        command += ["-p", args.test_path]
+    process = subprocess.Popen(command, env=env, start_new_session=True)
     try:
         raise SystemExit(process.wait(timeout=45))
     except subprocess.TimeoutExpired:
