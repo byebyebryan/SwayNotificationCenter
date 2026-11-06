@@ -23,6 +23,13 @@ rtk proxy git log --oneline HEAD..upstream/main
 rtk proxy git diff --stat b8017a4d1a53debdf0e8766628fb80357eae31e7..HEAD
 ```
 
+The fork's `main` is its maintained downstream branch; `upstream/main` is the
+upstream refresh source. Base ongoing work on the current fork `main` in a
+feature branch or worktree, then consolidate and review the branch before a
+release. Preserve published commits and integrate changes forward without
+rewriting published history. Keep a source or test change separate from the
+commit that updates the canonical package recipe.
+
 Update the recorded baseline when an upstream integration is accepted. Keep
 feature commits separate from package-recipe and consumer-selection commits.
 Avoid rewriting published history or reformatting unrelated upstream files.
@@ -45,10 +52,34 @@ must not add background polling to a legacy widget. Generic fixes are good
 candidates for a separate upstream contribution; personal selection and policy
 stay downstream.
 
-## One native check entrypoint
+A future feature branch may evaluate splitting reusable GPU, NetworkManager
+and Bluetooth readers or widgets out of the legacy dashboard, with separate
+compatibility and lifecycle evidence.
 
-The [fork workflow](../.github/workflows/fork-checks.yml) runs the same command
-on Arch that maintainers can run locally:
+## Fork checks and platform compilation
+
+The [fork workflow](../.github/workflows/fork-checks.yml) runs on every push to
+`main`, pull request targeting `main`, and manual dispatch, without path
+filters. It has three checks and an aggregate named `Fork required checks`:
+
+- `native` runs the private source and widget checks below.
+- `arch-recipe` runs `tests/check-arch-recipe.py` in a clean Arch container as a
+  non-root user and builds the canonical `packaging/arch/PKGBUILD` against its
+  pinned source archive.
+- `policy` runs the standard-library policy negative cases and pinned
+  actionlint v1.7.12 across workflow syntax and embedded shell:
+  `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`.
+- `Fork required checks` waits for all three jobs and reports failure if any
+  prerequisite fails, is skipped, or is cancelled; the gate succeeds only when
+  all three checks succeed.
+
+The inherited `.github/workflows/PKGBUILD-build.yml` job is upstream-only:
+`PKGBUILD-git` hardcodes `git checkout main` in `prepare()`, so it cannot
+qualify this fork's pull-request source or pinned release recipe. Fork coverage
+comes from the strict `native` current-checkout build and `arch-recipe` pinned
+canonical package build.
+
+The native job runs the same command on Arch that maintainers can run locally:
 
 ```sh
 rtk proxy python tests/check-fork.py --compositor
@@ -65,17 +96,45 @@ graphical session. `--build-dir` and `--artifacts` select the build/capture path
 Install the normal build dependencies plus `python`, `python-gobject`, `dbus`,
 `xorg-server-xvfb` and `xorg-xauth`; the compositor checks also need `niri`,
 `kitty`, Mesa software rendering and fonts. The workflow records its package
-versions and uploads native captures and build/test logs. Existing upstream
-build and lint workflows remain independent; the new workflow checks source,
-tests and workflow changes without adding dependencies to the runtime package.
+versions and uploads native captures and build/test logs. A globally installed
+notifier or a previously used build is not a prerequisite.
 
-Both native runners compile their own settings schema inside the temporary
-fixture directory; a globally installed notifier or a previously used build is
-not a prerequisite. As of November 5, 2026, the inherited Fedora job is blocked
-before compilation by missing `pkgconfig(granite-7)` in its configured
-repositories. Arch is the qualified package/deployment path; Ubuntu's separate
-source build is additional compilation coverage. Keep other platform failures
-visible rather than treating them as a pass for an Arch release.
+The Arch recipe job is package-recipe acceptance for the source SHA and archive
+checksum selected by `PKGBUILD`; it is distinct from compiling the current
+checkout in `native`. The `ubuntu-build` job separately configures and compiles
+the checkout on Ubuntu 26.04 LTS. It is additional source compilation coverage,
+not canonical package or deployment acceptance.
+
+The Fedora source build is strict when it runs. It runs by default only in
+`ErikReider/SwayNotificationCenter`; this fork runs it only when the repository
+variable `SWAYNC_ENABLE_FEDORA_CHECKS` is exactly `true`, including manual
+dispatch. The Fedora COPR publisher runs only in the upstream repository and
+does not publish releases from this fork.
+
+The proposed branch-protection contexts are `Fork required checks`,
+`ubuntu-build`, `vala-linting`, `uncrustify`, and `rpmlint`. The proposed
+settings request body is the `branch_protection` member of
+`tests/ci-policy.json`; it has not been applied. Workflows do not configure
+repository settings: treat protection as
+enforced only after the settings are applied and verified in GitHub. Hosted
+check runs and release-readiness remain pending until the workflows and
+candidate commits are published and their checks have completed.
+
+Before release, the manual `fork-release-check.yml` workflow runs
+`tests/check-release.py` as a read-only readiness check. It verifies the full
+source commit pinned by the recipe, the required recipe checks, and the native
+check for that pinned source. It does not publish a release. A passing source
+check for the working tree cannot substitute for the pinned recipe and source
+checks.
+The readiness query is read-only against GitHub and writes its requested local
+JSON report to the selected output path.
+
+Run the verifier against the full recipe commit SHA and save its local report:
+
+```sh
+rtk proxy python3 tests/check-release.py --recipe-commit FULL_RECIPE_SHA \
+  --output build/fork-release-readiness.json
+```
 
 ## An upstream update
 
@@ -94,18 +153,27 @@ keeping the changes separate makes regressions easier to identify and revert.
 
 ## A downstream release
 
-1. Review and commit the source/tests/docs, and require the fork checks on that
-   source revision. Push the immutable source before calculating its canonical
-   GitHub archive hash.
+1. Consolidate and review source/tests/docs on a feature branch. Run the fork
+   checks for the candidate source revision. After publishing the branch, open
+   a pull request to `main` and verify its hosted required checks before
+   integrating the reviewed source. Confirm the exact source commit is
+   published on `main`, then calculate its canonical GitHub archive hash.
 2. Update `packaging/arch/PKGBUILD` with that full source commit and checksum.
-   Bump `pkgrel` for a downstream update at the same upstream version, then
-   commit the recipe separately.
-3. Build the canonical recipe, publish the package, recipe and checksums, and
+   Bump `pkgrel` for a downstream update at the same upstream version, and
+   keep the recipe update in a separate commit from the source change. Publish
+   the recipe candidate for its checks.
+3. Run the manual read-only release-readiness check on the exact candidate.
+   Treat branch protection as part of release readiness only after confirming
+   the repository actually requires the intended status contexts.
+4. Build the canonical recipe, publish the package, recipe and checksums, and
    verify anonymous downloads. Keep source, recipe, package and host receipts
    distinct; local builds can differ in archive metadata and compiler inputs.
-4. Update the managed consumer's source/recipe tuple, inspect scoped diffs and
+5. Update the managed consumer's source/recipe tuple, inspect scoped diffs and
    recovery artifacts, and apply only reviewed targets. Record offline hosts as
    pending. Retain the previous packages and configuration for rollback.
+
+Historical release 17 keeps its original acceptance and is not retroactively
+requalified under the new gate.
 
 Returning to upstream requires checking every selected fork contract, including
 retained actions and the information panel. An activation fix alone is not
