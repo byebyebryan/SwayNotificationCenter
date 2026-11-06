@@ -1,9 +1,10 @@
-# Maintained branch migration plan
+# Maintained branch migration record
 
-Status: branch name and development policy selected; migration implementation
-and GitHub cutover pending. This document records the plan as of November 5,
-2026. The published maintained/default branch remains `main` until the cutover
-below is verified. The ongoing workflow lives in the
+Status: GitHub cutover verified on November 5, 2026, at
+`2026-11-06T03:47:46Z` UTC. The maintained/default branch is `niri-plus`;
+historical `main` is preserved read-only. This forward documentation change
+records the completed cutover and follows the normal reviewed PR/check path.
+The ongoing workflow lives in the
 [maintenance guide](fork-maintenance.md#branches-and-development-history).
 
 ## Decisions
@@ -37,11 +38,11 @@ ref intact. It does not simplify the ancestry of existing `main` in place.
 The six preview commits cover activation, retained actions, the original
 dashboard, the unified information/clock/network widgets, Arch packaging, and
 CI/release verification. Their final tree matches the published baseline.
-The planned migration adds one focused commit for branch-aware CI, release
-validation, regression cases and the documentation being prepared here.
-That candidate has seven downstream commits; any documentation that records a
-completed cutover must follow as a normal reviewed commit once the cutover is
-verified. The original six-commit tree comparison is evidence for the
+Migration commit `d75e02357addbc4c044d6f08c6bb707fea1444e6` adds branch-aware
+CI, release validation, regression cases and the development instructions.
+That qualified candidate has seven downstream commits. This cutover record
+follows as a separate reviewed documentation commit, preserving the published
+migration candidate. The original six-commit tree comparison is evidence for the
 consolidation, not a claim that later migration changes leave that tree intact.
 
 The preview receipt is retained under
@@ -50,7 +51,53 @@ Recheck all heads, clean/dirty status, remote refs and recovery points before
 implementation. If the published maintained tip has advanced, reconcile that
 new work explicitly before using this recorded baseline.
 
+## Verified cutover
+
+The qualified migration commit is
+[`d75e02357addbc4c044d6f08c6bb707fea1444e6`](https://github.com/byebyebryan/SwayNotificationCenter/commit/d75e02357addbc4c044d6f08c6bb707fea1444e6).
+The historical `main` tip and all existing release tags were preserved.
+`niri-plus` has the five required GitHub Actions checks with administrator
+and up-to-date enforcement; force pushes and deletions are blocked. Merge
+commits remain available for upstream integrations. Historical `main` has the
+read-only lock enabled. Squash commit messages default to the PR title/body.
+
+Validation and acceptance:
+
+- All 34 policy regressions and pinned actionlint v1.7.12 passed.
+- The [hosted fork checks](https://github.com/byebyebryan/SwayNotificationCenter/actions/runs/42158198716)
+  passed source/native, canonical pinned Arch package, policy and aggregate jobs.
+- [Ubuntu compilation](https://github.com/byebyebryan/SwayNotificationCenter/actions/runs/42158198635)
+  and [all required lint checks](https://github.com/byebyebryan/SwayNotificationCenter/actions/runs/42158198687)
+  passed on the exact migration commit.
+- The [hosted release-readiness check](https://github.com/byebyebryan/SwayNotificationCenter/actions/runs/42158573749)
+  passed from a clean checkout, reporting `historical-release-17` provenance
+  with independently verified source and candidate recipe check results.
+- The full private native entrypoint also passed in an owned Arch container.
+  The application, styles and canonical package contents match historical
+  `main`; desktop state was preserved.
+- After cutover, a fresh anonymous clone with no branch argument selected
+  `niri-plus`; its read-only release verifier also reported the candidate ready.
+- Both immutable release-17 archives were downloaded anonymously and matched
+  the original source and recipe archive SHA-256 pins. Existing consumer pins
+  were preserved.
+
+The Niri Plus maintenance/widget links were updated through
+[documentation PR 1](https://github.com/byebyebryan/niri-plus/pull/1), merged as
+`4672016e7cfe4f4631b67209636b0720e9068784`. Its site build, 1,332 local browser
+assertions and hosted PR check passed; site publication has its own workflow.
+
+Machine-readable receipts, before/after settings, private native logs/captures
+and the original archive downloads are retained under
+`/home/bryan/code/SwayNotificationCenter-clock/build/niri-plus-migration-20261105/`.
+Final documentation/branch acceptance is verified after this record's normal
+PR integration; those checks advance the branch without rewriting the
+qualified migration commit.
+
 ## Implementation sequence
+
+The procedure below is retained for the migration's review and rollback
+context. The current branch state is recorded above; refresh evidence before
+performing any further repository transition.
 
 1. **Review and preserve.** Review the six commits for coherent source,
    packaging and CI boundaries. Reconfirm the exact tree comparison against the
