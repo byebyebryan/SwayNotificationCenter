@@ -29,13 +29,15 @@ Avoid rewriting published history or reformatting unrelated upstream files.
 
 ## Branches and development history
 
-The selected maintained branch is `niri-plus`, named for the desktop project
-this fork supports. The currently published default and maintained branch is
-still `main`. Continue using `main` until the
-[migration plan](niri-plus-migration-plan.md) records a verified cutover; the
-branch name in that plan is a target, not an already completed migration.
+The maintained downstream branch is `niri-plus`, also the GitHub default,
+named for the desktop project this fork supports. Start new work from its current tip.
+Historical `main` is preserved read-only at
+`45edc43ac67d29c457a987b58cec1e5d6fdf2894`; do not use it for new downstream
+work or merge it back into the consolidated lineage. The
+[migration record](niri-plus-migration-plan.md) preserves the baseline, cutover
+evidence and rollback procedure.
 
-After the cutover, branch roles are:
+Branch roles are:
 
 | Branch | Role |
 | --- | --- |
@@ -123,9 +125,8 @@ compatibility and lifecycle evidence.
 
 The [fork workflow](../.github/workflows/fork-checks.yml) covers every push to
 `main` or `niri-plus`, pull requests targeting either branch, and manual
-dispatch, without path filters. This includes coverage for the selected
-maintained branch before the default changes. It has three checks and an
-aggregate named `Fork required checks`:
+dispatch, without path filters. It has three checks and an aggregate named
+`Fork required checks`:
 
 - `native` runs the private source and widget checks below.
 - `arch-recipe` runs `tests/check-arch-recipe.py` in a clean Arch container as a
@@ -182,7 +183,7 @@ The branch-protection policy selects `Fork required checks`, `ubuntu-build`,
 after these contexts have been reported, and verify the live GitHub settings:
 
 ```sh
-rtk proxy gh api repos/byebyebryan/SwayNotificationCenter/branches/main/protection
+rtk proxy gh api repos/byebyebryan/SwayNotificationCenter/branches/niri-plus/protection
 ```
 
 Workflows do not configure repository settings. A source policy or local test
@@ -240,7 +241,7 @@ keeping the changes separate makes regressions easier to identify and revert.
    [development history policy](#branches-and-development-history). Keep all
    commits intended for one source change there until the final squash PR.
    Verify the PR's hosted required checks before integration into the current
-   maintained branch (`main` until cutover, then `niri-plus`).
+   maintained `niri-plus` branch.
 2. Wait for hosted checks on the exact resulting maintained source SHA.
    Confirm that immutable commit is published, then download, build and verify
    its exact canonical GitHub archive and calculate its checksum. A green PR

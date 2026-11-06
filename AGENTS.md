@@ -5,10 +5,11 @@ notification daemon. Read [the maintenance guide](docs/fork-maintenance.md) for
 the upstream baseline, downstream patch boundaries and release procedure.
 
 Follow the guide's [development history policy](docs/fork-maintenance.md#branches-and-development-history).
-The selected maintained branch is `niri-plus`; use current `main` until the
-[migration plan](docs/niri-plus-migration-plan.md) is complete. Keep incremental
-development commits on a feature branch until the complete change is ready for
-one squash-merged PR. If a whole development cycle should become one source
+The maintained/default branch is `niri-plus`; historical `main` is read-only.
+The [migration record](docs/niri-plus-migration-plan.md) preserves its baseline
+and cutover evidence. Keep incremental development commits on a feature branch
+until the complete change is ready for one squash-merged PR. If a whole
+development cycle should become one source
 commit, keep that cycle off the maintained branch until the final squash.
 Preserve shared development history with ordinary pushes. Never squash, rebase
 or force-push published maintained commits or move release tags. Start a fresh
