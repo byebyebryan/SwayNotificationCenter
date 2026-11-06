@@ -137,6 +137,7 @@ namespace SwayNotificationCenter.Widgets.WirelessData {
     public class BluetoothDevice : Object {
         public string path;
         public string name;
+        public string icon = "";
         public int battery = -1;
     }
 
@@ -170,6 +171,7 @@ namespace SwayNotificationCenter.Widgets.WirelessData {
                 if (entry.name.strip () == "") {
                     entry.name = "Bluetooth device";
                 }
+                entry.icon = text (device, "Icon").make_valid ();
                 int percentage = number (interfaces.lookup_value ("org.bluez.Battery1", null),
                                          "Percentage");
                 entry.battery = percentage >= 0 && percentage <= 100 ? percentage : -1;

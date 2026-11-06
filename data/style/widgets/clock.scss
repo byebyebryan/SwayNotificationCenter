@@ -1,0 +1,16 @@
+.widget-clock {
+  margin: 16px 16px 8px;
+  border: var(--border);
+  border-radius: var(--border-radius);
+  padding: 12px;
+  background: rgba(var(--noti-bg), var(--noti-bg-alpha));
+
+  .metric-value {
+    color: var(--text-color);
+    font-feature-settings: "tnum";
+  }
+
+  .clock-time {
+    font-weight: bold;
+  }
+}

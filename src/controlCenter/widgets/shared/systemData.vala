@@ -300,13 +300,11 @@ namespace SwayNotificationCenter.Widgets.SystemData {
                 double capacity = number (yield read (Path.build_filename (path, "capacity"),
                                                       cancellable));
                 sample.percentage = capacity >= 0 && capacity <= 100 ? capacity : -1;
-                double limit = number (yield read (Path.build_filename (path,
-                                                                        "charge_control_end_threshold"),
-                                                   cancellable));
+                var limit_path = Path.build_filename (path, "charge_control_end_threshold");
+                double limit = number (yield read (limit_path, cancellable));
                 sample.limit = limit > 0 && limit <= 100 ? limit : -1;
-                double start = number (yield read (Path.build_filename (path,
-                                                                        "charge_control_start_threshold"),
-                                                   cancellable));
+                var start_path = Path.build_filename (path, "charge_control_start_threshold");
+                double start = number (yield read (start_path, cancellable));
                 sample.start_threshold = start >= 0 && start <= 100 ? start : -1;
                 string current = yield read (Path.build_filename (path, "current_now"),
                                              cancellable);

@@ -1,19 +1,104 @@
 # Live system widgets
 
-The fork adds an opt-in native GTK dashboard. Add it to `widgets` and configure
-its polling intervals through `widget-config`:
+The fork adds an opt-in native GTK dashboard, standalone clock, and unified
+information widget. Configure polling intervals and clock formats through
+`widget-config`:
 
 ```json
 {
   "control-center-width": 448,
-  "widgets": ["title", "dnd", "dashboard", "notifications"],
+  "widgets": ["clock", "dashboard", "title", "notifications"],
   "widget-config": {
+    "clock": { "time-format": "%H:%M", "date-format": "%a, %b %-d" },
+    "title": { "show-dnd": true },
     "system-stats": { "interval": 1 },
     "gpu": { "interval": 2 },
     "battery": { "interval": 5 }
   }
 }
 ```
+
+The clock shows bold local time in the first column and a short weekday/date
+in the second column. The full date is
+available in its tooltip. It refreshes immediately when the
+panel opens and checks once per second while open, so time changes and date
+rollovers appear promptly. Both format strings use GLib `DateTime.format`
+directives; for example, `%I:%M:%S %p` shows 12-hour time with seconds.
+Set `widget-config.title.show-dnd` to `true` to place a compact DND switch
+beside the Notifications title and Clear All action. The switch keeps its full
+Do Not Disturb tooltip and accessible label; the standalone `dnd` widget
+remains available.
+
+## Unified information surface
+
+Add `information` to `widgets` to show local time, System, Connections, and
+Battery inside one divided frame:
+
+```json
+{
+  "control-center-width": 448,
+  "widgets": ["information", "title", "notifications"],
+  "widget-config": {
+    "clock": { "time-format": "%H:%M", "date-format": "%a, %b %-d" },
+    "system-stats": { "interval": 1 },
+    "gpu": { "interval": 2 },
+    "battery": { "interval": 5 }
+  }
+}
+```
+
+The composite reuses the existing clock, system-stats, GPU, NetworkManager,
+BlueZ, and battery readers. Its clock has bold local time on the left and a
+plain short date on the right. System meters show numeric CPU/RAM percentages
+and a matching level bar, with frequency and used/total GiB below. GPU/VRAM
+meters appear only for runtime-active NVIDIA devices. Unknown readings show an
+unavailable placeholder and do not create a zero-valued bar.
+
+Connections combines the primary NetworkManager link and up to two connected
+Bluetooth devices per row. Its networking row uses two equal columns, each with
+two lines. The left column shows a Wi-Fi symbol and SSID above a `Signal` label
+and right-aligned percentage. Ethernet uses a wired symbol and `Ethernet` above
+an `IP` label and right-aligned IPv4 address, falling back to IPv6. Signal/IP
+labels are muted; values use the same foreground, font and tabular digits as
+System. Signal uses the shared percentage formatter, including figure-space
+padding for single digits and `—` for an unknown value. Full SSIDs and addresses
+remain available in tooltips when ellipsized.
+
+The right column shows `↑ Up` and `↓ Down`, with right-aligned transfer rates.
+Byte counters come only from the displayed primary interface, using decimal
+B/s, KB/s, MB/s and larger units as needed. Rates sample once per second while
+the panel is open; there is no traffic sampling for legacy network/dashboard
+widgets. A fresh opening or interface change needs a new baseline, so rates
+initially show `—`. Missing counters and counter resets also discard the old
+baseline; a measured idle link shows `0 B/s`. Closing, reloading, removing the
+widget or losing the primary link cancels reads and stops the rate timer.
+
+Bluetooth symbols use BlueZ
+`Device1.Icon` metadata where the active theme provides it, with a generic
+Bluetooth fallback; device names have full tooltips and battery `0%` remains
+distinct from an unreported battery. Additional devices can be expanded, and
+the view resets to two when the panel closes. Empty Connections and Battery
+sections disappear with their separators. Service readers continue while a
+section is hidden and the panel is open, so the section can reappear.
+
+Battery displays a battery symbol and bold charge percentage on the left, with
+state on the right and the charge gauge below. A marker appears only for a
+valid charge limit reported by the battery. Charging uses the success meter
+color; discharging at 20% or below uses warning, and at 10% or below adds a
+text and accessible low-battery cue. Existing PWR/ETA details appear only when
+the battery is not resting on external power.
+
+`information#NAME` applies the same suffix to its child configuration keys:
+`clock#NAME`, `system-stats#NAME`, `gpu#NAME`, `network#NAME`,
+`bluetooth#NAME`, and `battery#NAME`. The widget has no extra product settings.
+Its stable classes are `.widget-information`, `.information-clock`,
+`.information-section`, `.information-section-title`, and `.information-meter`.
+Default styles define fallbacks for `--information-bg`,
+`--information-border-color`, `--information-heading-color`,
+`--information-meter-track`, `--information-meter-fill`,
+`--information-meter-charging`, `--information-meter-warning`, and
+`--information-meter-critical`; selected appearances may override these on
+`.widget-information`.
 
 The dashboard stacks full-width System, Network, Bluetooth and Battery cards.
 Each card uses two internal columns: CPU beside RAM, with GPU beside VRAM on
@@ -124,3 +209,7 @@ This optional target compiles the real panel/widget sources with a test entry
 point; it is not installed or built by normal package builds. The runner owns a
 private D-Bus session and Xvfb display, uses memory-backed settings, and cannot
 connect to the desktop system bus or audio server. It requires Xvfb and xauth.
+The runner loads and checks the compiled stylesheet from that build tree. Add
+`--screenshot /tmp/information.png` to save its deterministic native GTK
+Information fixture, including the optional sections, device overflow, and
+reported battery limit.

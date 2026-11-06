@@ -427,6 +427,12 @@
         "^calendar(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
           "$ref": "#/widgets/calendar"
         },
+        "^clock(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/clock"
+        },
+        "^information(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/information"
+        },
         "^system-stats(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
           "$ref": "#/widgets/system-stats"
         },
@@ -491,6 +497,29 @@
         }
       }
     },
+    "clock": {
+      "type": "object",
+      "description": "Local time and weekday/date while the control center is open",
+      "additionalProperties": false,
+      "properties": {
+        "time-format": {
+          "type": "string",
+          "default": "%H:%M",
+          "description": "strftime format for the local time"
+        },
+        "date-format": {
+          "type": "string",
+          "default": "%a, %b %-d",
+          "description": "strftime format for the weekday and date"
+        }
+      }
+    },
+    "information": {
+      "type": "object",
+      "description": "Unified clock, System, Connections and Battery information surface; settings remain in the existing clock, system-stats, gpu, network, bluetooth and battery widget-config entries",
+      "additionalProperties": false,
+      "properties": {}
+    },
     "notifications": {
       "type": "object",
       "description": "Control Center Title Widget",
@@ -517,6 +546,11 @@
           "type": "boolean",
           "description": "Whether to display a \"Clear All\" button",
           "default": true
+        },
+        "show-dnd": {
+          "type": "boolean",
+          "description": "Show a Do Not Disturb switch inline with the Notifications title",
+          "default": false
         },
         "button-text": {
           "type": "string",

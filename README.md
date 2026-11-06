@@ -9,7 +9,8 @@ A simple notification daemon with a GTK gui for notifications and the control ce
 
 This fork also supports [revision-checked actions for specific retained
 notifications](docs/notification-actions.md), alongside its Niri activation fix.
-It adds optional [live CPU/RAM and battery widgets](docs/system-widgets.md)
+It adds optional [live CPU/RAM, battery and clock widgets, plus a unified
+information surface](docs/system-widgets.md)
 that refresh only while the notification panel is open.
 
 *Note: SwayNotificationCenter only supports Desktops / Window Managers that
@@ -99,11 +100,33 @@ These widgets can be customized, added, removed and even reordered
 - Notifications (Will always be visible)
 - Label
 - Calendar
+- Clock (opt in)
 - Mpris (Media player controls for Spotify, Firefox, Chrome, etc...)
 - Menubar with dropdown and buttons
 - Button grid
 - Volume slider using PulseAudio
 - Backlight slider
+
+To show the local clock, add it to `widgets`; the defaults are 24-hour time
+without seconds and abbreviated weekday/month/day in two columns:
+
+```json
+{
+  "widgets": ["clock", "title", "notifications"],
+  "widget-config": {
+    "clock": {
+      "time-format": "%H:%M",
+      "date-format": "%a, %b %-d"
+    },
+    "title": { "show-dnd": true }
+  }
+}
+```
+
+For example, set `time-format` to `%I:%M:%S %p` for 12-hour time with seconds.
+Set `title.show-dnd` to `true` to put a compact DND switch and the Clear All
+action alongside the Notifications heading. The standalone DND widget remains
+available.
 
 ## Planned Features
 

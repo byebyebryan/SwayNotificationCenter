@@ -62,9 +62,9 @@ void test_network () {
 void test_bluetooth () {
     var snapshot = objects ("{" +
                             "'/adapter': {'org.bluez.Adapter1': {'Powered': <true>}}," +
-                            "'/one': {'org.bluez.Device1': {'Connected': <true>, 'Alias': <'Zulu headphones'>}, 'org.bluez.Battery1': {'Percentage': <byte 0>}},"
+                            "'/one': {'org.bluez.Device1': {'Connected': <true>, 'Alias': <'Zulu headphones'>, 'Icon': <'audio-headset'>}, 'org.bluez.Battery1': {'Percentage': <byte 0>}},"
                             +
-                            "'/two': {'org.bluez.Device1': {'Connected': <true>, 'Alias': <'A very long keyboard name'>}},"
+                            "'/two': {'org.bluez.Device1': {'Connected': <true>, 'Alias': <'A very long keyboard name'>, 'Icon': <'input-keyboard'>}},"
                             +
                             "'/three': {'org.bluez.Device1': {'Connected': <false>, 'Alias': <'Disconnected'>}},"
                             +
@@ -72,8 +72,10 @@ void test_bluetooth () {
     var bt = WirelessData.BluetoothSample.parse (snapshot);
     assert (bt.present && bt.powered && bt.devices.length == 3);
     assert (bt.devices[0].name == "A very long keyboard name" && bt.devices[0].battery == -1);
+    assert (bt.devices[0].icon == "input-keyboard");
     assert (bt.devices[1].name == "Mouse" && bt.devices[1].battery == -1);
     assert (bt.devices[2].name == "Zulu headphones" && bt.devices[2].battery == 0);
+    assert (bt.devices[2].icon == "audio-headset");
     bt =
         WirelessData.BluetoothSample.parse (objects (
                                                 "{'/adapter': {'org.bluez.Adapter1': {'Powered': <false>}}}"));

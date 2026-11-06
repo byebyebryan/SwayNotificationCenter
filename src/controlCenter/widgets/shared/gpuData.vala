@@ -54,8 +54,11 @@ namespace SwayNotificationCenter.Widgets.GpuData {
                 return;
             }
             try {
+                const string QUERY_FIELDS =
+                    "--query-gpu=clocks.current.graphics,utilization.gpu," +
+                    "memory.used,memory.total";
                 var process = new Subprocess.newv ({ binary, "--id=" + sample.pci,
-                                                     "--query-gpu=clocks.current.graphics,utilization.gpu,memory.used,memory.total",
+                                                     QUERY_FIELDS,
                                                      "--format=csv,noheader,nounits" },
                                                    SubprocessFlags.STDOUT_PIPE |
                                                    SubprocessFlags.STDERR_SILENCE);

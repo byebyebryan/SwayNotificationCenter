@@ -40,6 +40,12 @@ namespace SwayNotificationCenter.Widgets {
             case "calendar":
                 widget = new Calendar (suffix);
                 break;
+            case "clock":
+                widget = new Clock (suffix);
+                break;
+            case "information":
+                widget = new Information (suffix);
+                break;
             case "system-stats":
                 widget = new SystemStats (suffix);
                 break;
