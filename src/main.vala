@@ -102,7 +102,7 @@ namespace SwayNotificationCenter {
                 error ("Could not connect to DBus!... (%s)\n", e.message);
             }
 
-            noti_daemon = new NotiDaemon ();
+            noti_daemon = new NotiDaemon (conn);
             swaync_daemon = new SwayncDaemon ();
             // Notification Daemon
             Bus.own_name_on_connection (conn,

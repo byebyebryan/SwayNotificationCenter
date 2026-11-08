@@ -426,12 +426,100 @@
         },
         "^calendar(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
           "$ref": "#/widgets/calendar"
+        },
+        "^clock(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/clock"
+        },
+        "^information(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/information"
+        },
+        "^system-stats(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/system-stats"
+        },
+        "^battery(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/battery"
+        },
+        "^gpu(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/gpu"
+        },
+        "^dashboard(#[a-zA-Z0-9_-]{1,}){0,1}?$": {
+          "$ref": "#/widgets/dashboard"
         }
       }
     }
   },
   "widgets": {
     "$comment": "New widgets go here",
+    "dashboard": {
+      "type": "object",
+      "description": "Stacked system, primary-network, Bluetooth and battery cards with two internal columns; absent hardware, inactive GPU rows and empty Bluetooth cards are hidden",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "gpu": {
+      "type": "object",
+      "description": "NVIDIA GPU/VRAM rows inside dashboard system stats; query only GPUs whose cached PCI runtime state is active",
+      "additionalProperties": false,
+      "properties": {
+        "interval": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 2
+        }
+      }
+    },
+    "system-stats": {
+      "type": "object",
+      "description": "Live CPU frequency/utilization and used/total memory while the panel is open",
+      "additionalProperties": false,
+      "properties": {
+        "interval": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 1,
+          "description": "Refresh interval in seconds while the panel is open"
+        }
+      }
+    },
+    "battery": {
+      "type": "object",
+      "description": "System batteries with charge/discharge power and approximate time to empty or the reported charge limit; hidden without a system battery",
+      "additionalProperties": false,
+      "properties": {
+        "interval": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 5,
+          "description": "Refresh interval in seconds while the panel is open"
+        }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "description": "Local time and weekday/date while the control center is open",
+      "additionalProperties": false,
+      "properties": {
+        "time-format": {
+          "type": "string",
+          "default": "%H:%M",
+          "description": "strftime format for the local time"
+        },
+        "date-format": {
+          "type": "string",
+          "default": "%a, %b %-d",
+          "description": "strftime format for the weekday and date"
+        }
+      }
+    },
+    "information": {
+      "type": "object",
+      "description": "Unified clock, System, Connections and Battery information surface; settings remain in the existing clock, system-stats, gpu, network, bluetooth and battery widget-config entries",
+      "additionalProperties": false,
+      "properties": {}
+    },
     "notifications": {
       "type": "object",
       "description": "Control Center Title Widget",
@@ -458,6 +546,11 @@
           "type": "boolean",
           "description": "Whether to display a \"Clear All\" button",
           "default": true
+        },
+        "show-dnd": {
+          "type": "boolean",
+          "description": "Show a Do Not Disturb switch inline with the Notifications title",
+          "default": false
         },
         "button-text": {
           "type": "string",

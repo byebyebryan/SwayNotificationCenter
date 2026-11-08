@@ -1,18 +1,24 @@
-name: Check build for Fedora.
+name: Fedora source build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ niri-plus ]
   pull_request:
-    branches: [ main ]
+    branches: [ niri-plus ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   fedora-build:
+    if: >-
+      github.repository == 'ErikReider/SwayNotificationCenter' ||
+      (github.repository == 'byebyebryan/SwayNotificationCenter' &&
+       vars.SWAYNC_ENABLE_FEDORA_CHECKS == 'true')
     container: registry.fedoraproject.org/fedora-minimal:latest
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Install tooling for source RPM build
@@ -26,9 +32,10 @@ jobs:
 
       # It is necessary to checkout into sub-directory, because of some weird ownership problems cause by using containers
       - name: Check out sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
           path: swaync
 
       - name: Copy spec into root dir
@@ -51,4 +58,4 @@ jobs:
         run: |
           cd swaync
           mkdir -p out
-          rpkg local --out `pwd`/out
+          rpkg local --out "$(pwd)/out"

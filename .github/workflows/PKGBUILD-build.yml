@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Check PKGBUILD builds for Arch.
+name: Check upstream Arch development recipe
 
 # Controls when the workflow will run
 on:
@@ -15,6 +15,8 @@ on:
 
 jobs:
   PKGBUILD-build:
+    # The fork checks its checkout and canonical pinned recipe independently.
+    if: github.repository == 'ErikReider/SwayNotificationCenter'
     container: archlinux:base-devel
     runs-on: ubuntu-latest
     steps:

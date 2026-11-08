@@ -7,6 +7,18 @@
 
 A simple notification daemon with a GTK gui for notifications and the control center
 
+This fork also supports [revision-checked actions for specific retained
+notifications](docs/notification-actions.md), alongside its Niri activation fix.
+It adds optional [live CPU/RAM, battery and clock widgets, plus a unified
+information surface](docs/system-widgets.md)
+that refresh only while the notification panel is open.
+
+[![Fork native checks](https://github.com/byebyebryan/SwayNotificationCenter/actions/workflows/fork-checks.yml/badge.svg)](https://github.com/byebyebryan/SwayNotificationCenter/actions/workflows/fork-checks.yml)
+
+Fork contributors: see the [upstream baseline, patch map and maintenance
+workflow](docs/fork-maintenance.md). Native fork regressions have one entrypoint:
+`python tests/check-fork.py --compositor`.
+
 *Note: SwayNotificationCenter only supports Desktops / Window Managers that
 support `wlr_layer_shell_unstable_v1` like Sway or anything wlroots based*
 
@@ -94,11 +106,33 @@ These widgets can be customized, added, removed and even reordered
 - Notifications (Will always be visible)
 - Label
 - Calendar
+- Clock (opt in)
 - Mpris (Media player controls for Spotify, Firefox, Chrome, etc...)
 - Menubar with dropdown and buttons
 - Button grid
 - Volume slider using PulseAudio
 - Backlight slider
+
+To show the local clock, add it to `widgets`; the defaults are 24-hour time
+without seconds and abbreviated weekday/month/day in two columns:
+
+```json
+{
+  "widgets": ["clock", "title", "notifications"],
+  "widget-config": {
+    "clock": {
+      "time-format": "%H:%M",
+      "date-format": "%a, %b %-d"
+    },
+    "title": { "show-dnd": true }
+  }
+}
+```
+
+For example, set `time-format` to `%I:%M:%S %p` for 12-hour time with seconds.
+Set `title.show-dnd` to `true` to put a compact DND switch and the Clear All
+action alongside the Notifications heading. The standalone DND widget remains
+available.
 
 ## Planned Features
 

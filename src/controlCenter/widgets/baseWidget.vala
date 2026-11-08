@@ -37,6 +37,15 @@ namespace SwayNotificationCenter.Widgets {
             }
         }
 
+        protected void add_heading (string title) {
+            orientation = Gtk.Orientation.VERTICAL;
+            spacing = 8;
+            var label = new Gtk.Label (title);
+            label.xalign = 0;
+            label.add_css_class ("dashboard-card-title");
+            append (label);
+        }
+
         protected Json.Object ?get_config (Gtk.Widget widget) {
             unowned OrderedHashTable<Json.Object> config
                 = ConfigModel.instance.widget_config;

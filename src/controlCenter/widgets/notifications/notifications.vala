@@ -231,6 +231,19 @@ namespace SwayNotificationCenter.Widgets {
             add_notification (new_params);
         }
 
+        internal Notification ?find_notification (uint32 id) {
+            unowned NotificationGroup ?group = noti_groups_id.get (id);
+            if (group == null || group.dismissed) {
+                return null;
+            }
+            unowned Notification ?notification = group.notification_ids.get (id);
+            if (notification == null || notification.dismissed
+                || notification.param.applied_id != id) {
+                return null;
+            }
+            return notification;
+        }
+
         public void add_notification (NotifyParams param) {
             var noti = new Notification.regular (param, NotificationType.CONTROL_CENTER);
             noti.set_time ();
@@ -336,10 +349,10 @@ namespace SwayNotificationCenter.Widgets {
                 case "Home" :
                     navigate_to_first_notification ();
                     break;
-                case "End":
+                case "End" :
                     navigate_to_last_notification ();
                     break;
-                default:
+                    default :
                     // Pressing 1-9 to activate a notification action
                     for (int i = 0; i < 9; i++) {
                         uint num_keyval = Gdk.keyval_from_name (
@@ -347,10 +360,10 @@ namespace SwayNotificationCenter.Widgets {
                         if (keyval == num_keyval && group != null) {
                             var noti = group.get_latest_notification ();
                             noti.click_alt_action (i);
-                            break;
+                            return true;
                         }
                     }
-                    break;
+                    return false;
             }
             // Override the builtin list navigation
             return true;

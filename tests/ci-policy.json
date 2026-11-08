@@ -1,0 +1,28 @@
+{
+  "maintained_branch": "niri-plus",
+  "required_recipe_checks": [
+    "Fork required checks",
+    "ubuntu-build",
+    "vala-linting",
+    "uncrustify",
+    "rpmlint"
+  ],
+  "required_source_checks": ["native"],
+  "branch_protection": {
+    "required_status_checks": {
+      "strict": true,
+      "contexts": [
+        "Fork required checks",
+        "ubuntu-build",
+        "vala-linting",
+        "uncrustify",
+        "rpmlint"
+      ]
+    },
+    "enforce_admins": true,
+    "required_pull_request_reviews": null,
+    "restrictions": null,
+    "allow_force_pushes": false,
+    "allow_deletions": false
+  }
+}

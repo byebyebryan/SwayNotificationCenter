@@ -236,7 +236,7 @@ namespace SwayNotificationCenter {
             surface.set_input_region (region);
         }
 
-        private inline unowned Notification ?find_notification (uint32 id) {
+        internal inline unowned Notification ?find_notification (uint32 id) {
             unowned Notification ?notification = notification_ids.get (id);
             if (notification == null || notification.param.applied_id != id) {
                 return null;

@@ -160,6 +160,31 @@ namespace SwayNotificationCenter {
             noti_daemon.invoke_latest_floating_default_action ();
         }
 
+        /** Snapshot a specific popup or retained notification; empty if absent.
+         * The opaque revision changes on every Notify call, even if identical.
+         */
+        public HashTable<string, Variant> get_notification (uint32 id)
+        throws DBusError, IOError {
+            return noti_daemon.get_notification (id);
+        }
+
+        /** Invoke an exact action only if the inspected revision is current.
+         * Returns dispatched, stale, or unavailable. No latest-item fallback.
+         */
+        public string invoke_action (uint32 id, string revision, string action_key)
+        throws DBusError, IOError {
+            return noti_daemon.invoke_action (id, revision, action_key);
+        }
+
+        /** Forward an activation token obtained by an external user interface.
+         * The compositor remains responsible for validating this opaque token.
+         */
+        public string invoke_action_with_token (uint32 id, string revision,
+                                                string action_key, string activation_token)
+        throws DBusError, IOError {
+            return noti_daemon.invoke_action (id, revision, action_key, activation_token);
+        }
+
         /**
          * Adds an inhibitor with the Application ID
          * (ex: "org.erikreider.swaysettings", "swayidle", etc...).
