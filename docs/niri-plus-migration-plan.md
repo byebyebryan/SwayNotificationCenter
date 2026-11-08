@@ -1,10 +1,10 @@
 # Niri Plus reset record
 
-Status: the one-time clean reset is approved and in preparation as of November
-7, 2026. This record defines the intended lineage and release gates; it does
-not claim that public refs, releases, packages or hosts have completed cutover.
-The final release receipt must record the actual commit SHAs and acceptance
-evidence. Do not substitute planned labels for those measured values.
+The one-time clean reset was approved on November 7, 2026. This record captures
+its construction and release gates. The
+[`niri-plus-1` release receipt](https://github.com/byebyebryan/SwayNotificationCenter/releases/tag/niri-plus-1)
+records the resulting recipe SHA, public cutover and package acceptance;
+managed host rollout has independent consumer receipts.
 
 ## Intended lineage
 
@@ -19,11 +19,15 @@ niri-plus:  U -> S -> P               maintained/default branch
                     niri-plus-1       planned tag at P
 ```
 
-`S` is the single downstream source baseline. Its final SHA is assigned only
-after the source commit is created. `P` is a separate recipe commit after `S`;
-its SHA and the `niri-plus-1` tag are assigned only after exact-source and
-exact-recipe qualification. The tag and public release are planned, not
-published by this record.
+`S` is the single downstream source baseline,
+`7e0ea67572a5c98412572c1ef3eb6920354fa1d6`. Its anonymous archive has SHA-256
+`aa54161e698a434f8b1b624b1cdbdc214d2516e56a708e31217dce4ccb413408`;
+all 152 tracked files matched the published tree, all four Meson suites passed,
+and all five required hosted contexts passed. Its `src/`, `data/`, `meson.build`
+and manpage objects match the accepted pre-reset tree exactly. `P` is the
+separate package-18 recipe commit after `S`, identified by the immutable
+`niri-plus-1` release tag after recipe qualification. Its exact SHA belongs in
+the release receipt rather than in a self-referential source file.
 
 ## Source and recipe gates
 
@@ -70,11 +74,10 @@ the branch and release procedure.
 
 ## Completion evidence
 
-The planned public acceptance receipt is the
+The public acceptance receipt is the
 [`niri-plus-1` release](https://github.com/byebyebryan/SwayNotificationCenter/releases/tag/niri-plus-1).
-This is a stable destination, not evidence that the tag or release exists. Once
-published, its release notes and assets will carry the exact `S`/`P` SHAs and
-release-readiness receipt.
+Its release notes and assets carry the exact `S`/`P` SHAs and release-readiness
+receipt after publication; preparing this record alone does not publish them.
 
 The final receipt records exact `U`, `S` and `P` SHAs; exact hosted check results;
 source archive contents and checksum; canonical recipe build and package

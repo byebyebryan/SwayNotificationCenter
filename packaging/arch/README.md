@@ -10,14 +10,14 @@ in `src/xdg_activation.vala`; it does not apply a separate downstream patch to
 an upstream release. The reset source line starts at upstream development
 commit `b8017a4`, rather than the `0.12.6` release tag.
 
-The reset source commit `S` may retain the existing recipe-17 pin temporarily
-as a build input while its archived source remains available. That pin is not
-release-ready on the reset lineage because its source is not an ancestor of
-`S`; the strict release check must reject it. After `S` is published, passes
-its exact hosted checks, and its immutable source archive is inspected, built
-and hashed, the separate recipe commit `P` can set `pkgrel` to 18 and pin that
-exact `S` SHA and measured archive checksum. This is the intended sequence,
-not a claim that package 18 or its release checks are complete.
+The current recipe selects `swaync-bryan 0.12.6-18`, pinning source baseline
+[`7e0ea67572a5c98412572c1ef3eb6920354fa1d6`](https://github.com/byebyebryan/SwayNotificationCenter/commit/7e0ea67572a5c98412572c1ef3eb6920354fa1d6)
+and its measured immutable archive checksum. Source and recipe are separate
+commits. The source passed its exact hosted checks and anonymous-archive
+build before the recipe pin changed. The
+[first maintained release](https://github.com/byebyebryan/SwayNotificationCenter/releases/tag/niri-plus-1)
+records the recipe SHA, package hashes and release-readiness result. Managed
+host acceptance has separate consumer receipts.
 
 ## Build and install
 
@@ -27,16 +27,13 @@ user. Preinstalling runtime dependencies keeps `--rmdeps` from removing them
 before the separate package-install transaction. Chezmoi's package manifest
 already does this for selected hosts.
 
-The commands below retain the existing package-17 example. In source commit
-`S`, building its recipe-17 pin is only a temporary source/build check, not a
-release or rollout instruction. The install command names the preserved
-package-17 artifact; it is not post-reset host acceptance. Update these
-version-specific examples to package 18 in recipe commit `P`, after `S` has
-been qualified.
+Use the qualified recipe commit identified by the release, rather than the
+source baseline's transitional recipe. Build and inspect its package before
+installing it:
 
 ```sh
 rtk proxy makepkg --syncdeps --rmdeps --noconfirm
-rtk proxy sudo pacman -U --noconfirm --ask=4 swaync-bryan-0.12.6-17-x86_64.pkg.tar.zst
+rtk proxy sudo pacman -U --noconfirm --ask=4 swaync-bryan-0.12.6-18-x86_64.pkg.tar.zst
 rtk proxy systemctl --user restart swaync.service
 ```
 
@@ -67,9 +64,8 @@ on Starship. Local OSC 9 and SSH-delivered OSC 9 alerts both produced activation
 and default-action signals on click, with nonzero input serials in Wayland
 traces. Bryan confirmed that clicking focused the terminal. The separate
 `swaync-bryan` package replaced that initial backport with a direct fork build.
-This is historical evidence for the stable-release activation backport; it does
-not qualify reset source `S`, recipe `P`, package 18 or any post-reset host
-installation.
+Those dated activation checks are separate from current package and host
+acceptance.
 
 ## Return to upstream
 
