@@ -23,6 +23,11 @@ do not dismiss the notification, run scripts, or substitute another action.
 There is no latest-notification fallback. The existing latest-popup methods
 and desktop click behavior retain their action selection and token semantics.
 
+When history retention removes a control-center card, its still-visible popup
+remains available to `GetNotification` and the action methods. Once the popup
+also ends, the notification is closed and subsequent action calls return
+`unavailable`.
+
 The server checks revision and invokes the current widget's action in one GTK
 main-loop turn. Dispatch uses the same action, activation-token helper, scripts,
 and resident handling as a desktop click. A non-resident action closes its
@@ -50,8 +55,9 @@ when those IDs are reused. Replacements take the current Notify sender, and a
 missing origin never falls back to broadcasting. Ordinary subscribers therefore
 cannot observe another client's actions; actual bus monitors remain independent.
 
-Explicitly dismissed, sender-closed, and expired transient notifications cannot
-be invoked. This API does not persist application callbacks across restarts.
+Explicitly dismissed, sender-closed, history-evicted after its popup ends, and
+expired transient notifications cannot be invoked. This API does not persist
+application callbacks across restarts.
 
 ## Native validation
 

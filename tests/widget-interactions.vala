@@ -1104,6 +1104,142 @@ namespace SwayNotificationCenter.WidgetTests {
         control_center.set_visibility (false);
     }
 
+    Gtk.Entry ? find_reply_entry (Gtk.Widget root) {
+        if (root is Gtk.Entry) {
+            return (Gtk.Entry) root;
+        }
+        for (var child = root.get_first_child (); child != null;
+             child = child.get_next_sibling ()) {
+            var entry = find_reply_entry (child);
+            if (entry != null) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    void test_history_retention_config () {
+        string[] invalid_values = { "-1", "2147483648", "4294967297", "1.5", "\"300\"",
+                                    "true", "null", "[]", "{}" };
+        foreach (string property in new string[] { "history-retention",
+                                                   "history-retention-critical" }) {
+            string other = property == "history-retention"
+                ? "history-retention-critical" : "history-retention";
+            foreach (string invalid in invalid_values) {
+                uint warnings = 0;
+                var fatal_mask = Log.set_always_fatal (
+                    LogLevelFlags.LEVEL_ERROR | LogLevelFlags.LEVEL_CRITICAL);
+                uint handler = Log.set_handler ("swaync", LogLevelFlags.LEVEL_WARNING,
+                                                (domain, level, message) => {
+                    assert (message.contains ("Invalid %s value".printf (property)));
+                    warnings++;
+                });
+                reload_test_config ("{\"layer-shell\": false, \"widgets\": [\"notifications\"]," +
+                                    "\"widget-config\": {\"notifications\": {}}," +
+                                    "\"timeout\": 42, \"%s\": %s, \"%s\": 37}".printf (
+                                        property, invalid, other));
+                Log.remove_handler ("swaync", handler);
+                Log.set_always_fatal (fatal_mask);
+                assert (warnings == 1);
+                assert (ConfigModel.instance.timeout == 42);
+                if (property == "history-retention") {
+                    assert (ConfigModel.instance.history_retention == 0);
+                    assert (ConfigModel.instance.history_retention_critical == 37);
+                } else {
+                    assert (ConfigModel.instance.history_retention_critical == 0);
+                    assert (ConfigModel.instance.history_retention == 37);
+                }
+            }
+        }
+        reload_test_config ("{\"layer-shell\": false, \"widgets\": [\"notifications\"]," +
+                            "\"widget-config\": {\"notifications\": {}}," +
+                            "\"history-retention\": 2147483647, \"history-retention-critical\": 7}");
+        assert (ConfigModel.instance.history_retention == int.MAX);
+        assert (ConfigModel.instance.history_retention_critical == 7);
+        reload_test_config ("{\"layer-shell\": false, \"widgets\": [\"notifications\"]," +
+                            "\"widget-config\": {\"notifications\": {}}}");
+        assert (ConfigModel.instance.history_retention == 0);
+        assert (ConfigModel.instance.history_retention_critical == 0);
+    }
+
+    void test_history_retention_reply_focus () {
+        reload_test_config ("{\"layer-shell\": false, \"history-retention\": 1," +
+                            "\"transition-time\": 0, \"hide-on-clear\": true," +
+                            "\"notification-inline-replies\": true," +
+                            "\"widget-config\": {\"title\": {}, \"notifications\": {}}," +
+                            "\"widgets\": [\"title\", \"notifications\"]}");
+        control_center.set_visibility (true);
+        drain ();
+
+        var scrolled = (Gtk.ScrolledWindow) control_center.get_child ();
+        var viewport = (Gtk.Viewport) scrolled.get_child ();
+        var box = (Gtk.Box) viewport.get_child ();
+        var other_control = new Gtk.Button.with_label ("Retention fixture control");
+        box.prepend (other_control);
+
+        try {
+            var hints = new HashTable<string, Variant> (str_hash, str_equal);
+            assert (other_control.grab_focus ());
+            noti_daemon.new_notification ("retention-group-test", 0, "", "First old card", "",
+                                          {}, hints, 100);
+            noti_daemon.new_notification ("retention-group-test", 0, "", "Second old card", "",
+                                          {}, hints, 100);
+            assert (notifications_widget.n_notifications == 2);
+            assert (notifications_widget.n_groups == 1);
+            wait_for_timeout (1250);
+            assert (notifications_widget.n_notifications == 0);
+            assert (notifications_widget.n_groups == 0);
+            assert (control_center.get_focus () == other_control);
+
+            uint32 id = noti_daemon.new_notification ("retention-reply-test", 0, "",
+                                                      "Keep my draft", "An owned reply fixture",
+                                                      { "inline-reply", "Reply" }, hints, 100);
+            var notification = notifications_widget.find_notification (id);
+            assert_nonnull (notification);
+            wait_for_layout (control_center);
+            var entry = find_reply_entry (notification);
+            assert_nonnull (entry);
+            entry.set_text ("A draft that must not disappear");
+            assert (entry.grab_focus ());
+            drain ();
+            assert (notification.history_reply_active);
+            wait_for_timeout (1250);
+            assert (notifications_widget.find_notification (id) == notification);
+            assert (entry.get_text () == "A draft that must not disappear");
+
+            // Moving from the entry to Send is still inside the reply controls.
+            var send = (Gtk.Button) entry.get_next_sibling ();
+            assert_nonnull (send);
+            assert (send.grab_focus ());
+            drain ();
+            assert (notification.history_reply_active);
+            wait_for_timeout (80);
+            assert_nonnull (notifications_widget.find_notification (id));
+
+            uint closed = 0;
+            ulong handler = noti_daemon.NotificationClosed.connect ((closed_id, reason) => {
+                if (closed_id == id) {
+                    assert (reason == ClosedReasons.EXPIRED);
+                    closed++;
+                }
+            });
+            assert (other_control.grab_focus ());
+            wait_for_timeout (80);
+            assert_null (notifications_widget.find_notification (id));
+            assert (notifications_widget.n_notifications == 0);
+            assert (control_center.get_visibility ());
+            assert (control_center.get_focus () == other_control);
+            assert (closed == 1);
+            noti_daemon.disconnect (handler);
+        } catch (Error e) {
+            error ("History retention GTK fixture failed: %s", e.message);
+        }
+        box.remove (other_control);
+        control_center.set_visibility (false);
+        reload_test_config ("{\"layer-shell\": false, \"widgets\": [\"notifications\"]," +
+                            "\"widget-config\": {\"notifications\": {}}}");
+    }
+
     public int main (string[] args) {
         assert (Environment.get_variable ("SWAYNC_PRIVATE_WIDGET_TEST") == "1");
         Test.init (ref args);
@@ -1132,6 +1268,7 @@ namespace SwayNotificationCenter.WidgetTests {
             monitors = Gdk.Display.get_default ().get_monitors ();
             noti_daemon = new NotiDaemon (Bus.get_sync (BusType.SESSION));
             swaync_daemon = new SwayncDaemon ();
+            floating_notifications = new NotificationWindow ();
             notifications_widget = new Widgets.Notifications ();
             control_center = new ControlCenter ();
             app.add_window (control_center);
@@ -1144,7 +1281,12 @@ namespace SwayNotificationCenter.WidgetTests {
             Test.add_func ("/widgets/clock-reload-removal", test_clock_reload_removal);
             Test.add_func ("/widgets/information-composite", test_information_widget);
             Test.add_func ("/widgets/network-activity-lifecycle", test_network_activity_lifecycle);
+            Test.add_func ("/widgets/history-retention-config", test_history_retention_config);
+            Test.add_func ("/widgets/history-retention-reply-and-focus",
+                           test_history_retention_reply_focus);
             int result = Test.run ();
+            noti_daemon.shutdown_history_retention ();
+            floating_notifications.destroy ();
             control_center.destroy ();
             FileUtils.remove (config);
             DirUtils.remove (directory);

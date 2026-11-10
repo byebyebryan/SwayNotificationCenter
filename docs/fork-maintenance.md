@@ -112,6 +112,7 @@ for squash behavior and the caution about reusing a squashed development branch.
 | --- | --- | --- |
 | Niri activation | Small GDK launch-context change in `src/xdg_activation.vala` | Originating-window activation in the private compositor |
 | Retained notification actions | Notification identity/revision and D-Bus hooks in notification model, daemon and action dispatch | Retained/replaced cards, owner routing, notifier restart and ID reuse |
+| Notification history retention | Fork-owned receipt-age tracker and shared boot-time timer, with narrow daemon/control-center lifecycle hooks | Pure age/deadline/deferred tests and private native expiry, replacement and view-lifecycle checks |
 | Information and legacy status widgets | Fork-owned widget, reader and style files; factory, schema and control-center lifecycle hooks | Data suites, native GTK layout/keyboard checks, private NetworkManager/BlueZ and visibility tests |
 | Clock and inline DND | Clock module and a small title-row/config extension | Formatting, switch binding, reload/removal and timer cleanup |
 | Explicit system stylesheet | Respect custom/skip flags before resolving the installed default in `src/functions.vala` | The clean native compositor fixture runs without an installed SwayNC stylesheet |

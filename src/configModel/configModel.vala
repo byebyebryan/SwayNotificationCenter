@@ -585,6 +585,40 @@ namespace SwayNotificationCenter {
             }
         }
 
+        /** Maximum age for ordinary notification history, in seconds; 0 is unlimited. */
+        private int _history_retention = 0;
+        public int history_retention {
+            get {
+                return _history_retention;
+            }
+            set {
+                if (value < 0) {
+                    warning ("%s must be at least 0 seconds; using 0 (unlimited)",
+                             "history-retention");
+                    _history_retention = 0;
+                } else {
+                    _history_retention = value;
+                }
+            }
+        }
+
+        /** Maximum age for critical notification history, in seconds; 0 is unlimited. */
+        private int _history_retention_critical = 0;
+        public int history_retention_critical {
+            get {
+                return _history_retention_critical;
+            }
+            set {
+                if (value < 0) {
+                    warning ("%s must be at least 0 seconds; using 0 (unlimited)",
+                             "history-retention-critical");
+                    _history_retention_critical = 0;
+                } else {
+                    _history_retention_critical = value;
+                }
+            }
+        }
+
         /** The transition time for all animations */
         private const int TRANSITION_TIME_DEFAULT = 200;
         private int _transition_time = TRANSITION_TIME_DEFAULT;
@@ -860,6 +894,32 @@ namespace SwayNotificationCenter {
 
         /* Methods */
 
+        private bool deserialize_history_retention_property (string property_name,
+                                                             out Value value,
+                                                             Json.Node property_node) {
+            int seconds = 0;
+            bool valid = false;
+
+            if (property_node.get_node_type () == Json.NodeType.VALUE
+                && property_node.get_value_type () == typeof (int64)) {
+                int64 parsed_seconds = property_node.get_int ();
+                if (parsed_seconds >= 0 && parsed_seconds <= int.MAX) {
+                    seconds = (int) parsed_seconds;
+                    valid = true;
+                }
+            }
+
+            if (!valid) {
+                warning (
+                    "Invalid %s value; expected integer seconds from 0 to %d; using 0 (unlimited)",
+                    property_name, int.MAX);
+            }
+
+            value = Value (typeof (int));
+            value.set_int (seconds);
+            return true;
+        }
+
         /**
          * Selects the deserialization method based on the property name.
          * Needed to parse those parameters of complex types like hashtables,
@@ -940,7 +1000,11 @@ namespace SwayNotificationCenter {
                     }
                     value = result;
                     return true;
-                    default :
+                case "history-retention" :
+                case "history-retention-critical" :
+                    return deserialize_history_retention_property (
+                        property_name, out value, property_node);
+                default:
                     // Handles all other properties
                     return default_deserialize_property (
                         property_name, out value, pspec, property_node);
@@ -972,7 +1036,7 @@ namespace SwayNotificationCenter {
                     var table = (OrderedHashTable<Category>) value;
                     node.set_object (serialize_hashtable<Category> (table));
                     break;
-                case "notification-action-filter" :
+                case "notification-action-filter":
                     node = new Json.Node (Json.NodeType.OBJECT);
                     var table = (OrderedHashTable<ActionMatching>) value;
                     node.set_object (serialize_hashtable<ActionMatching> (table));
@@ -1156,7 +1220,7 @@ namespace SwayNotificationCenter {
                         break;
                     case Type.BOXED :
                         switch (typeof (T).name ()) {
-                            case "JsonObject":
+                            case "JsonObject" :
                                 json_object.set_object_member (key,
                                                                (Json.Object) item);
                                 break;

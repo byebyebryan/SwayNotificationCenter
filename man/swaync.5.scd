@@ -115,6 +115,18 @@ config file to be able to detect config errors
 	default: 0 ++
 	description: The notification timeout for notifications with critical priority. 0 to disable
 
+*history-retention* ++
+	type: integer ++
+	default: 0 ++
+	description: Maximum age in seconds for low and normal notification history. 0 means unlimited. ++
+		Resident notifications are exempt. Accepted updates and replacements reset age.
+
+*history-retention-critical* ++
+	type: integer ++
+	default: 0 ++
+	description: Maximum age in seconds for critical notification history. 0 means unlimited and does not inherit *history-retention*. ++
+		Reload recalculates age from receipt. Expiring history does not end a live popup.
+
 *notification-window-width* ++
 	type: integer ++
 	default: 500 ++

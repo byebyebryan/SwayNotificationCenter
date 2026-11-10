@@ -133,6 +133,20 @@
       "description": "The notification timeout for notifications with critical priority. 0 to disable",
       "default": 0
     },
+    "history-retention": {
+      "type": "integer",
+      "description": "Maximum age in seconds for low and normal notification history. 0 means unlimited.",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "history-retention-critical": {
+      "type": "integer",
+      "description": "Maximum age in seconds for critical notification history. 0 means unlimited and does not inherit history-retention.",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 2147483647
+    },
     "notification-window-width": {
       "type": "integer",
       "description": "Width of the notification in pixels",

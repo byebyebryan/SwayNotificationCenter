@@ -9,6 +9,7 @@ namespace SwayNotificationCenter {
         private HashTable<string, uint32> synchronous_ids =
             new HashTable<string, uint32> (str_hash, str_equal);
         private Gee.HashSet<uint32> notification_ids = new Gee.HashSet<uint32> ();
+        private NotificationHistory notification_history;
 
         /** Do Not Disturb state */
         internal bool dnd { get; set; default = false; }
@@ -21,6 +22,30 @@ namespace SwayNotificationCenter {
 
             // Init dnd from gsettings
             self_settings.bind ("dnd-state", this, "dnd", SettingsBindFlags.DEFAULT);
+
+            notification_history = new NotificationHistory (this);
+        }
+
+        internal void shutdown_history_retention () {
+            notification_history.shutdown ();
+        }
+
+        internal void set_history_reply_active (NotifyParams param, bool active) {
+            notification_history.set_reply_active (param, active);
+        }
+
+        internal void history_popup_removed (NotifyParams param) {
+            notification_history.popup_removed (param);
+        }
+
+        internal bool retire_notification_id (uint32 id, ClosedReasons reason) {
+            if (!notification_ids.remove (id)) {
+                return false;
+            }
+            notification_history.forget (id);
+            // Invalidate action lookup before telling the sender it is closed.
+            NotificationClosed (id, reason);
+            return true;
         }
 
         internal uint n_notifications {
@@ -42,8 +67,9 @@ namespace SwayNotificationCenter {
 
             debug ("Dismissing notification with ID:%u, reason:%s",
                    id, reason.to_string ());
-            NotificationClosed (id, reason);
-            notification_ids.remove (id);
+            if (!retire_notification_id (id, reason)) {
+                return;
+            }
 
             notifications_widget.remove_notification (id);
             floating_notifications.remove_notification (id);
@@ -62,8 +88,7 @@ namespace SwayNotificationCenter {
             debug ("Dismissing notification group with ID:%s, reason:%s",
                    group_name_id, reason.to_string ());
             foreach (unowned uint32 id in ids) {
-                NotificationClosed (id, reason);
-                notification_ids.remove (id);
+                retire_notification_id (id, reason);
                 floating_notifications.remove_notification (id);
             }
             notifications_widget.remove_group (group_name_id);
@@ -73,10 +98,11 @@ namespace SwayNotificationCenter {
 
         internal void request_dismiss_all_notifications (ClosedReasons reason) {
             debug ("Dismissing all notifications, reason:%s", reason.to_string ());
-            foreach (uint32 id in notification_ids) {
-                NotificationClosed (id, reason);
+            var ids = notification_ids.to_array ();
+            foreach (uint32 id in ids) {
+                retire_notification_id (id, reason);
             }
-            notification_ids.clear ();
+            notification_history.clear ();
 
             remove_all_floating_notifications (false, null);
             notifications_widget.remove_all_notifications (true);
@@ -95,8 +121,7 @@ namespace SwayNotificationCenter {
                     if (param.applied_id > 0 && param.ignore_cc ()) {
                         debug ("Closing floating-only notification with ID:%u while hiding",
                                param.applied_id);
-                        NotificationClosed (param.applied_id, ClosedReasons.DISMISSED);
-                        notification_ids.remove (param.applied_id);
+                        retire_notification_id (param.applied_id, ClosedReasons.DISMISSED);
                     }
                     return true;
                 }
@@ -226,17 +251,16 @@ namespace SwayNotificationCenter {
          */
         [DBus (name = "GetCapabilities")]
         public string[] get_capabilities () throws DBusError, IOError {
-            return {
-                       "actions",
-                       "body",
-                       "body-markup",
-                       "body-images",
-                       "persistence",
-                       "synchronous",
-                       "private-synchronous",
-                       "x-canonical-private-synchronous",
-                       "inline-reply",
-            };
+            string[] capabilities = { "actions", "body", "body-markup", "body-images" };
+            if (ConfigModel.instance.history_retention == 0
+                && ConfigModel.instance.history_retention_critical == 0) {
+                capabilities += "persistence";
+            }
+            capabilities += "synchronous";
+            capabilities += "private-synchronous";
+            capabilities += "x-canonical-private-synchronous";
+            capabilities += "inline-reply";
+            return capabilities;
         }
 
         /**
@@ -297,6 +321,10 @@ namespace SwayNotificationCenter {
                     notification_id_to_replace = r_id;
                 }
                 synchronous_ids.set (param.synchronous, id);
+            }
+
+            if (notification_id_to_replace > 0) {
+                notification_history.forget (notification_id_to_replace);
             }
 
             // Don't show the floating notification if disabled and not transient
@@ -377,6 +405,10 @@ namespace SwayNotificationCenter {
                 }
 
                 swaync_daemon.emit_subscribe ();
+            }
+
+            if (added && !param.ignore_cc ()) {
+                notification_history.track (param);
             }
 
 #if WANT_SCRIPTING

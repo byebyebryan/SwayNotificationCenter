@@ -35,9 +35,20 @@ subdir('src')
 executable('widget-interaction-test',
   [app_sources, app_resources, 'tests/widget-interactions.vala'],
   vala_args: args + ['--main=SwayNotificationCenter.WidgetTests.main'],
+  include_directories: include_directories('src/notiDaemon'),
   dependencies: app_deps,
   build_by_default: false,
 )
+
+history_retention_test = executable(
+  'history-retention-test',
+  ['tests/history-retention.vala',
+   'src/notiDaemon/historyRetention.vala',
+   'src/notiDaemon/historyRetentionTimer.c'],
+  include_directories: include_directories('src/notiDaemon'),
+  dependencies: [dependency('gio-2.0'), dependency('gee-0.8')],
+)
+test('history-retention', history_retention_test)
 
 system_data_test = executable('system-data-test',
   ['tests/system-data.vala', 'src/controlCenter/widgets/shared/systemData.vala'],

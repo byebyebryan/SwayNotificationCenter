@@ -120,6 +120,13 @@ namespace SwayNotificationCenter.Widgets {
                 expanded_group = null;
             }
 
+            var window = get_root () as Gtk.Window;
+            Gtk.Widget ?focus = window != null ?window.get_focus () : null;
+
+            if (focus != null && focus != this && !focus.is_ancestor (this)) {
+                return;
+            }
+
             // Only change the group focus if the dismissed group is focused
             unowned NotificationGroup ?focused_group =
                 (NotificationGroup) list_box.get_focus_child ();
