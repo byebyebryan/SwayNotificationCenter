@@ -1220,7 +1220,7 @@ namespace SwayNotificationCenter {
                         break;
                     case Type.BOXED :
                         switch (typeof (T).name ()) {
-                            case "JsonObject" :
+                            case "JsonObject":
                                 json_object.set_object_member (key,
                                                                (Json.Object) item);
                                 break;
