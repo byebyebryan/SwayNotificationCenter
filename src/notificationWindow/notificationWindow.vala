@@ -255,8 +255,6 @@ namespace SwayNotificationCenter {
          */
         public void remove_all_notifications (bool transition,
                                               notification_filter_func ?filter_func) {
-            notification_ids.clear ();
-            inline_reply_notifications.clear ();
             foreach (unowned AnimatedListItem item in list.children) {
                 if (item.destroying) {
                     continue;
@@ -268,7 +266,9 @@ namespace SwayNotificationCenter {
                 }
             }
 
-            set_visible (false);
+            if (notification_ids.is_empty) {
+                set_visible (false);
+            }
         }
 
         private void remove_notification_internal (Notification notification, bool transition) {
@@ -286,6 +286,7 @@ namespace SwayNotificationCenter {
 
             // Remove notification and its destruction timeout
             notification.remove_noti_timeout ();
+            noti_daemon.history_popup_removed (param);
             list.remove.begin (notification, transition, (obj, res) => {
                 if (list.is_empty ()) {
                     set_visible (false);

@@ -19,6 +19,8 @@
   "timeout": 10,
   "timeout-low": 5,
   "timeout-critical": 0,
+  "history-retention": 0,
+  "history-retention-critical": 0,
   "fit-to-screen": true,
   "relative-timestamps": true,
   "control-center-width": 500,

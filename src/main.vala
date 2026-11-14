@@ -69,6 +69,13 @@ namespace SwayNotificationCenter {
             init.begin ();
         }
 
+        protected override void shutdown () {
+            if (noti_daemon != null) {
+                noti_daemon.shutdown_history_retention ();
+            }
+            base.shutdown ();
+        }
+
         private async void init () {
             Functions.load_css (style_path);
 

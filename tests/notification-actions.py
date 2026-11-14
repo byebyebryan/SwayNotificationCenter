@@ -17,7 +17,8 @@ from native_fixtures import prepare_schema
 import time
 
 
-def run(binary, client_test, dashboard_screenshot=None, information=False, stylesheet=None):
+def run(binary, client_test, dashboard_screenshot=None, information=False, stylesheet=None,
+        retention_only=False):
     import gi
     gi.require_version("Gio", "2.0")
     from gi.repository import Gio, GLib
@@ -165,8 +166,24 @@ def run(binary, client_test, dashboard_screenshot=None, information=False, style
 
                 server = start()
 
-                # Native information widgets poll only while visible, including across reloads.
                 original_config = json.loads(config.read_text())
+
+                def retention_checks():
+                    from notification_retention import check_retention
+                    try:
+                        check_retention(call=call, notify=notify, snapshot=snapshot, invoke=invoke,
+                                        pump=pump, config=config, original_config=original_config,
+                                        events=events, GLib=GLib)
+                    except Exception:
+                        log.flush()
+                        print((root / "server.log").read_text()[-12000:], file=sys.stderr)
+                        raise
+
+                if retention_only:
+                    retention_checks()
+                    return
+
+                # Native information widgets poll only while visible, including across reloads.
                 widget_config = dict(original_config, widgets=["system-stats", "battery", "notifications"],
                                      **{"widget-config": {"system-stats": {"interval": 1},
                                                           "battery": {"interval": 1}}})
@@ -420,6 +437,9 @@ def run(binary, client_test, dashboard_screenshot=None, information=False, style
                     for registration in registrations:
                         bus.unregister_object(registration)
 
+                if information:
+                    retention_checks()
+
                 # Screenshots can issue their own notifications. Start the action
                 # cases with a fresh sequence so the restart ID reuse is controlled.
                 server.terminate(); server.wait(timeout=3)
@@ -630,6 +650,7 @@ if __name__ == "__main__":
     parser.add_argument("--binary", required=True)
     parser.add_argument("--dashboard-screenshot")
     parser.add_argument("--information", action="store_true", help="exercise the unified information layout")
+    parser.add_argument("--retention-only", action="store_true", help="run only private history retention cases")
     parser.add_argument("--stylesheet", help="optional private fixture stylesheet")
     parser.add_argument("--client-test", nargs=argparse.REMAINDER, default=[])
     args = parser.parse_args()
@@ -647,9 +668,12 @@ if __name__ == "__main__":
                 command += ["--dashboard-screenshot", str(Path(args.dashboard_screenshot).resolve())]
             if args.information:
                 command += ["--information"]
+            if args.retention_only:
+                command += ["--retention-only"]
             if args.stylesheet:
                 command += ["--stylesheet", str(Path(args.stylesheet).resolve())]
             if args.client_test:
                 command += ["--client-test", *args.client_test]
             raise SystemExit(subprocess.call(command, env=env))
-    run(args.binary, args.client_test, args.dashboard_screenshot, args.information, args.stylesheet)
+    run(args.binary, args.client_test, args.dashboard_screenshot, args.information, args.stylesheet,
+        args.retention_only)

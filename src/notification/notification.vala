@@ -85,6 +85,13 @@ namespace SwayNotificationCenter {
         public int number_of_body_lines { get; construct; default = 10; }
 
         public bool has_inline_reply { get; private set; default = false; }
+        private Gtk.EventControllerFocus reply_focus;
+
+        internal bool history_reply_active {
+            get {
+                return has_inline_reply && get_mapped () && reply_focus.contains_focus;
+            }
+        }
 
         private static Regex code_regex;
 
@@ -246,6 +253,11 @@ namespace SwayNotificationCenter {
                 }
             });
             inline_reply_entry.add_controller (reply_key_controller);
+            reply_focus = new Gtk.EventControllerFocus ();
+            inline_reply_box.add_controller (reply_focus);
+            reply_focus.notify["contains-focus"].connect (sync_history_reply_focus);
+            map.connect (sync_history_reply_focus);
+            unmap.connect (sync_history_reply_focus);
             inline_reply_button.clicked.connect (() => {
                 string text = inline_reply_entry.get_text ().strip ();
                 if (text.length == 0) {
@@ -255,6 +267,12 @@ namespace SwayNotificationCenter {
                 // Dismiss notification without activating Action
                 action_clicked (null);
             });
+        }
+
+        private void sync_history_reply_focus () {
+            if (notification_type == NotificationType.CONTROL_CENTER && param != null) {
+                noti_daemon.set_history_reply_active (param, history_reply_active);
+            }
         }
 
         private void build_noti () {

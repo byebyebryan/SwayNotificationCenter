@@ -79,6 +79,9 @@ app_sources = [
   'underlay/underlay.vala',
   'configModel/configModel.vala',
   'swayncDaemon/swayncDaemon.vala',
+  'notiDaemon/historyRetention.vala',
+  'notiDaemon/historyRetentionTimer.c',
+  'notiDaemon/notificationHistory.vala',
   'notiDaemon/notiDaemon.vala',
   'notiModel/notiModel.vala',
   'notificationWindow/notificationWindow.vala',
@@ -143,6 +146,7 @@ app_sources = files(app_sources) + [constants]
 executable('swaync',
   [ app_sources, app_resources ],
   vala_args: args,
+  include_directories: include_directories('notiDaemon'),
   dependencies: app_deps,
   install: true,
 )
